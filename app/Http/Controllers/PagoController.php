@@ -5,24 +5,110 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
 
 class PagoController extends Controller
 {
     private $tokenService;
     private $tokenSecret;
     private $apiUrl;
+    private $loginUrl;
 
     public function __construct()
     {
         $this->tokenService = env('PAGOFACIL_TOKEN_SERVICE');
         $this->tokenSecret = env('PAGOFACIL_TOKEN_SECRET');
-        $this->apiUrl = env('PAGOFACIL_API_URL');
+        $this->apiUrl = 'https://masterqr.pagofacil.com.bo/api/services/v2';
+        $this->loginUrl = $this->apiUrl . '/login';
+    }
+
+    private function getAccessToken()
+    {
+        $accessToken = Cache::get('pagofacil_access_token');
+        
+        if ($accessToken) {
+            return $accessToken;
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'tcTokenService' => $this->tokenService,
+                'tcTokenSecret' => $this->tokenSecret
+            ])->post($this->loginUrl);
+
+            \Log::info('PagoFácil Login Request:', [
+                'url' => $this->loginUrl,
+                'token_service_length' => strlen($this->tokenService),
+                'token_secret_length' => strlen($this->tokenSecret)
+            ]);
+
+            \Log::info('PagoFácil Login Response:', [
+                'status' => $response->status(),
+                'body' => $response->json()
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if (isset($data['error']) && $data['error'] == 0 && isset($data['values']['accessToken'])) {
+                    $accessToken = $data['values']['accessToken'];
+                    $expiresInMinutes = $data['values']['expiresInMinutes'] ?? 720;
+                    
+                    Cache::put('pagofacil_access_token', $accessToken, now()->addMinutes($expiresInMinutes - 5));
+                    
+                    return $accessToken;
+                }
+            }
+
+            throw new \Exception('Error al obtener access token: ' . $response->body());
+
+        } catch (\Exception $e) {
+            \Log::error('Error en login PagoFácil: ' . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    private function getPaymentMethodId($accessToken)
+    {
+        $paymentMethodId = Cache::get('pagofacil_payment_method_id');
+        
+        if ($paymentMethodId) {
+            return $paymentMethodId;
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $accessToken
+            ])->post($this->apiUrl . '/list-enabled-services');
+
+            \Log::info('PagoFácil List Services Response:', [
+                'status' => $response->status(),
+                'body' => $response->json()
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if (isset($data['values']) && is_array($data['values']) && count($data['values']) > 0) {
+                    $paymentMethodId = $data['values'][0]['paymentMethodId'];
+                    
+                    Cache::put('pagofacil_payment_method_id', $paymentMethodId, now()->addHours(24));
+                    
+                    return $paymentMethodId;
+                }
+            }
+
+            throw new \Exception('No se encontraron métodos de pago habilitados');
+
+        } catch (\Exception $e) {
+            \Log::error('Error al listar servicios PagoFácil: ' . $e->getMessage());
+            throw $e;
+        }
     }
 
     public function generarQR(Request $request)
     {
         try {
-            // Validar datos del request
             $request->validate([
                 'cliente_id' => 'required|integer',
                 'productos' => 'required|array',
@@ -33,15 +119,14 @@ class PagoController extends Controller
                 'cliente_email' => 'required|email'
             ]);
 
-            // Obtener datos del cliente y productos
+            $accessToken = $this->getAccessToken();
+            $paymentMethodId = $this->getPaymentMethodId($accessToken);
+
             $clienteId = $request->cliente_id;
             $productos = $request->productos;
             $total = $request->total;
-
-            // Generar número de pago único
             $paymentNumber = 'MP' . time() . $clienteId;
 
-            // Preparar detalles de orden para PagoFácil
             $orderDetail = [];
             
             foreach ($productos as $producto) {
@@ -55,46 +140,38 @@ class PagoController extends Controller
                 ];
             }
 
-            // Preparar payload para PagoFácil según documentación v2
             $payload = [
-                'paymentMethod' => 4, // QR
+                'paymentMethod' => $paymentMethodId,
                 'clientName' => $request->cliente_nombre,
-                'documentType' => 1, // CI
+                'documentType' => 1,
                 'documentId' => preg_replace('/[^0-9]/', '', $request->cliente_ci),
                 'phoneNumber' => preg_replace('/[^0-9]/', '', $request->cliente_telefono),
                 'email' => $request->cliente_email,
                 'paymentNumber' => $paymentNumber,
                 'amount' => (float)$total,
-                'currency' => 2, // BOB
-                'clientCode' => $this->tokenSecret, // Commerce ID
+                'currency' => 2,
+                'clientCode' => $this->tokenSecret,
                 'callbackUrl' => url('/api/pago-callback'),
                 'orderDetail' => $orderDetail
             ];
 
-            // Headers para la petición según documentación PagoFácil v2
             $headers = [
                 'Accept' => 'application/json',
                 'Content-Type' => 'application/json',
-                'TokenService' => $this->tokenService
+                'Authorization' => 'Bearer ' . $accessToken
             ];
 
-            // Hacer petición a PagoFácil
             $response = Http::withHeaders($headers)
                 ->timeout(30)
-                ->post($this->apiUrl, $payload);
+                ->post($this->apiUrl . '/generate-qr', $payload);
 
-            \Log::info('PagoFácil Request:', [
-                'url' => $this->apiUrl,
-                'headers' => [
-                    'Authorization' => 'Bearer ' . substr($this->tokenService, 0, 50) . '...',
-                    'Content-Type' => $headers['Content-Type'],
-                    'Accept' => $headers['Accept']
-                ],
+            \Log::info('PagoFácil Generate QR Request:', [
+                'url' => $this->apiUrl . '/generate-qr',
                 'payload' => $payload,
-                'token_length' => strlen($this->tokenService)
+                'payment_method_id' => $paymentMethodId
             ]);
 
-            \Log::info('PagoFácil Response:', [
+            \Log::info('PagoFácil Generate QR Response:', [
                 'status' => $response->status(),
                 'body' => $response->json()
             ]);
@@ -102,7 +179,6 @@ class PagoController extends Controller
             if ($response->successful()) {
                 $pagoFacilResponse = $response->json();
                 
-                // Verificar si hay error en la respuesta
                 if (isset($pagoFacilResponse['error']) && $pagoFacilResponse['error'] != 0) {
                     return response()->json([
                         'success' => false,
@@ -118,11 +194,10 @@ class PagoController extends Controller
                     'total' => $total,
                     'estado' => 'pendiente',
                     'cliente_id' => $clienteId,
-                    'vendedor_id' => null, // Para ventas online
+                    'vendedor_id' => null,
                     'cotizacion_id' => null
                 ]);
 
-                // Crear detalles de venta
                 foreach ($productos as $producto) {
                     DB::table('detalle_venta')->insert([
                         'cantidad' => $producto['cantidad'],
@@ -133,7 +208,6 @@ class PagoController extends Controller
                     ]);
                 }
 
-                // Crear registro de pago
                 $pagoId = DB::table('pago')->insertGetId([
                     'monto' => $total,
                     'metodo' => 'QR_PagoFacil',
@@ -141,23 +215,23 @@ class PagoController extends Controller
                     'venta_id' => $ventaId
                 ]);
 
-                // Guardar datos adicionales del QR en cache para poder consultarlos
-                cache([
-                    'qr_' . $pagoId => [
-                        'payment_number' => $paymentNumber,
-                        'transaction_id' => $pagoFacilResponse['values']['transactionId'] ?? $pagoFacilResponse['transactionId'] ?? null,
-                        'qr_url' => $pagoFacilResponse['values']['qrImage'] ?? $pagoFacilResponse['qrImage'] ?? null,
-                        'venta_id' => $ventaId,
-                        'productos' => $productos
-                    ]
-                ], now()->addHours(2)); // Cache por 2 horas
+                $qrImage = $pagoFacilResponse['values']['qrImage'] ?? null;
+                $transactionId = $pagoFacilResponse['values']['transactionId'] ?? null;
+
+                Cache::put('qr_' . $pagoId, [
+                    'payment_number' => $paymentNumber,
+                    'transaction_id' => $transactionId,
+                    'qr_image' => $qrImage,
+                    'venta_id' => $ventaId,
+                    'productos' => $productos
+                ], now()->addHours(2));
 
                 return response()->json([
                     'success' => true,
                     'pago_id' => $pagoId,
-                    'qr_url' => $pagoFacilResponse['values']['qrImage'] ?? $pagoFacilResponse['qrImage'] ?? null,
-                    'qr_image' => $pagoFacilResponse['values']['qrImage'] ?? $pagoFacilResponse['qrImage'] ?? null,
-                    'transaction_id' => $pagoFacilResponse['values']['transactionId'] ?? $pagoFacilResponse['transactionId'] ?? null,
+                    'qr_image' => $qrImage,
+                    'qr_url' => $qrImage,
+                    'transaction_id' => $transactionId,
                     'payment_number' => $paymentNumber,
                     'total' => $total
                 ]);
@@ -165,11 +239,13 @@ class PagoController extends Controller
             } else {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Error al generar QR: ' . $response->body()
+                    'error' => 'Error al generar QR: ' . $response->body(),
+                    'status' => $response->status()
                 ], 500);
             }
 
         } catch (\Exception $e) {
+            \Log::error('Error en generarQR: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'error' => 'Error interno: ' . $e->getMessage()
@@ -180,40 +256,33 @@ class PagoController extends Controller
     public function callback(Request $request)
     {
         try {
-            // Manejar callback de PagoFácil
             $data = $request->all();
             \Log::info('PagoFácil Callback:', $data);
 
-            // Buscar el pago usando cache y payment_number
-            $transactionId = $data['transactionId'] ?? null;
-            $paymentNumber = $data['paymentNumber'] ?? null;
-            $status = $data['status'] ?? null;
+            $pedidoId = $data['PedidoID'] ?? null;
+            $estado = $data['Estado'] ?? null;
 
-            if ($paymentNumber) {
-                // Buscar en cache usando payment_number
-                $cacheKeys = cache()->getStore()->getMemcached()->getAllKeys();
+            if ($pedidoId) {
                 $pagoData = null;
                 $pagoId = null;
                 
+                $cacheKeys = Cache::get('qr_keys', []);
+                
                 foreach ($cacheKeys as $key) {
-                    if (str_contains($key, 'qr_')) {
-                        $data_cache = cache($key);
-                        if ($data_cache && $data_cache['payment_number'] === $paymentNumber) {
-                            $pagoData = $data_cache;
-                            $pagoId = str_replace('qr_', '', $key);
-                            break;
-                        }
+                    $data_cache = Cache::get($key);
+                    if ($data_cache && isset($data_cache['payment_number']) && $data_cache['payment_number'] === $pedidoId) {
+                        $pagoData = $data_cache;
+                        $pagoId = str_replace('qr_', '', $key);
+                        break;
                     }
                 }
 
                 if ($pagoData && $pagoId) {
-                    // Si el pago es exitoso, actualizar la venta a completado
-                    if ($status === 'completed') {
+                    if (strtolower($estado) === 'completado' || strtolower($estado) === 'pagado') {
                         DB::table('venta')
                             ->where('id', $pagoData['venta_id'])
                             ->update(['estado' => 'completado']);
                     } else {
-                        // Si falla, marcar como fallido
                         DB::table('venta')
                             ->where('id', $pagoData['venta_id'])
                             ->update(['estado' => 'fallido']);
@@ -221,18 +290,27 @@ class PagoController extends Controller
                 }
             }
 
-            return response()->json(['success' => true]);
+            return response()->json([
+                'error' => 0,
+                'status' => 1,
+                'message' => 'Notificación recibida correctamente',
+                'values' => true
+            ], 200);
 
         } catch (\Exception $e) {
             \Log::error('Error en callback de PagoFácil: ' . $e->getMessage());
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json([
+                'error' => 1,
+                'status' => 0,
+                'message' => 'Error procesando callback',
+                'values' => false
+            ], 500);
         }
     }
 
     public function consultarEstado($pagoId)
     {
         try {
-            // Buscar el pago y su venta asociada
             $pago = DB::table('pago')
                 ->join('venta', 'pago.venta_id', '=', 'venta.id')
                 ->where('pago.id', $pagoId)
@@ -243,14 +321,14 @@ class PagoController extends Controller
                 return response()->json(['error' => 'Pago no encontrado'], 404);
             }
 
-            // Buscar datos adicionales en cache
-            $qrData = cache('qr_' . $pagoId);
+            $qrData = Cache::get('qr_' . $pagoId);
 
             return response()->json([
                 'pago_id' => $pago->id,
-                'estado' => $pago->venta_estado, // Estado de la venta
+                'estado' => $pago->venta_estado,
                 'monto' => $pago->monto,
                 'payment_number' => $qrData['payment_number'] ?? 'N/A',
+                'transaction_id' => $qrData['transaction_id'] ?? 'N/A',
                 'fecha_pago' => $pago->fecha_pago
             ]);
 
