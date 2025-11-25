@@ -46,35 +46,36 @@ class PagoController extends Controller
             
             foreach ($productos as $producto) {
                 $orderDetail[] = [
-                    'Serial' => count($orderDetail) + 1,
-                    'Producto' => $producto['nombre'],
-                    'Cantidad' => (int)$producto['cantidad'],
-                    'Precio' => (float)$producto['costo_unitario'],
-                    'Descuento' => 0,
-                    'Total' => (float)($producto['cantidad'] * $producto['costo_unitario'])
+                    'serial' => count($orderDetail) + 1,
+                    'product' => $producto['nombre'],
+                    'quantity' => (int)$producto['cantidad'],
+                    'price' => (float)$producto['costo_unitario'],
+                    'discount' => 0,
+                    'total' => (float)($producto['cantidad'] * $producto['costo_unitario'])
                 ];
             }
 
-            // Preparar payload para PagoFácil según documentación
+            // Preparar payload para PagoFácil según documentación v2
             $payload = [
-                'tcCommerceID' => $this->tokenSecret, // Token Secret (Commerce ID)
-                'tnMoneda' => 2, // BOB
-                'tnTelefono' => (int)preg_replace('/[^0-9]/', '', $request->cliente_telefono),
-                'tcNombreUsuario' => $request->cliente_nombre,
-                'tnCiNit' => (int)preg_replace('/[^0-9]/', '', $request->cliente_ci),
-                'tcNroPago' => $paymentNumber,
-                'tnMontoClienteEmpresa' => (float)$total,
-                'tcCorreo' => $request->cliente_email,
-                'tcUrlCallBack' => url('/api/pago-callback'),
-                'taPedidoDetalle' => $orderDetail
+                'paymentMethod' => 4, // QR
+                'clientName' => $request->cliente_nombre,
+                'documentType' => 1, // CI
+                'documentId' => preg_replace('/[^0-9]/', '', $request->cliente_ci),
+                'phoneNumber' => preg_replace('/[^0-9]/', '', $request->cliente_telefono),
+                'email' => $request->cliente_email,
+                'paymentNumber' => $paymentNumber,
+                'amount' => (float)$total,
+                'currency' => 2, // BOB
+                'clientCode' => $this->tokenSecret, // Commerce ID
+                'callbackUrl' => url('/api/pago-callback'),
+                'orderDetail' => $orderDetail
             ];
 
-            // Headers para la petición según documentación PagoFácil
-            // El TokenService va en el header como autenticación
+            // Headers para la petición según documentación PagoFácil v2
             $headers = [
                 'Accept' => 'application/json',
                 'Content-Type' => 'application/json',
-                'TokenService' => $this->tokenService
+                'Authorization' => 'Bearer ' . $this->tokenService
             ];
 
             // Hacer petición a PagoFácil
@@ -99,7 +100,8 @@ class PagoController extends Controller
                 if (isset($pagoFacilResponse['error']) && $pagoFacilResponse['error'] != 0) {
                     return response()->json([
                         'success' => false,
-                        'error' => 'Error de PagoFácil: ' . ($pagoFacilResponse['message'] ?? 'Error desconocido')
+                        'error' => 'Error de PagoFácil: ' . ($pagoFacilResponse['message'] ?? 'Error desconocido'),
+                        'details' => $pagoFacilResponse
                     ], 400);
                 }
                 
@@ -137,8 +139,8 @@ class PagoController extends Controller
                 cache([
                     'qr_' . $pagoId => [
                         'payment_number' => $paymentNumber,
-                        'transaction_id' => $pagoFacilResponse['values']['transactionId'] ?? null,
-                        'qr_url' => $pagoFacilResponse['values']['qrImage'] ?? null,
+                        'transaction_id' => $pagoFacilResponse['values']['transactionId'] ?? $pagoFacilResponse['transactionId'] ?? null,
+                        'qr_url' => $pagoFacilResponse['values']['qrImage'] ?? $pagoFacilResponse['qrImage'] ?? null,
                         'venta_id' => $ventaId,
                         'productos' => $productos
                     ]
@@ -147,9 +149,9 @@ class PagoController extends Controller
                 return response()->json([
                     'success' => true,
                     'pago_id' => $pagoId,
-                    'qr_url' => $pagoFacilResponse['values']['qrImage'] ?? null,
-                    'qr_image' => $pagoFacilResponse['values']['qrImage'] ?? null,
-                    'transaction_id' => $pagoFacilResponse['values']['transactionId'] ?? null,
+                    'qr_url' => $pagoFacilResponse['values']['qrImage'] ?? $pagoFacilResponse['qrImage'] ?? null,
+                    'qr_image' => $pagoFacilResponse['values']['qrImage'] ?? $pagoFacilResponse['qrImage'] ?? null,
+                    'transaction_id' => $pagoFacilResponse['values']['transactionId'] ?? $pagoFacilResponse['transactionId'] ?? null,
                     'payment_number' => $paymentNumber,
                     'total' => $total
                 ]);

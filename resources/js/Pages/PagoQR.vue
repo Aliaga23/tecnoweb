@@ -331,7 +331,7 @@ const verificarEstado = async () => {
   try {
     if (!pagoInfo.value.pago_id) return;
 
-    const response = await fetch(`/api/pago-estado/${pagoInfo.value.pago_id}`);
+    const response = await apiFetch(`/api/pago-estado/${pagoInfo.value.pago_id}`);
     const data = await response.json();
 
     if (data.estado === 'completado') {
