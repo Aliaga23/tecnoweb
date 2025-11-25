@@ -230,16 +230,14 @@ class PagoController extends Controller
                     'productos' => $productos
                 ], now()->addHours(2));
 
-                return response()->json([
-                    'success' => true,
-                    'pago_id' => $pagoId,
-                    'qr_image' => $qrImage,
-                    'transaction_id' => $transactionId,
-                    'payment_number' => $paymentNumber,
-                    'total' => $totalOriginal
-                ]);
-
-            } else {
+            return response()->json([
+                'success' => true,
+                'pago_id' => $pagoId,
+                'qr_image' => $qrImage,
+                'transaction_id' => $transactionId,
+                'payment_number' => $paymentNumber,
+                'total' => $total
+            ]);            } else {
                 return response()->json([
                     'success' => false,
                     'error' => 'Error al generar QR: ' . $response->body(),
