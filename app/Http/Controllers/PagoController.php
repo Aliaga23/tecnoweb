@@ -191,7 +191,7 @@ class PagoController extends Controller
                 // Usar vendedor_id = 3 (sistema) para ventas online
                 $ventaId = DB::table('venta')->insertGetId([
                     'fecha_venta' => now(),
-                    'tipo' => 'online',
+                    'tipo' => 'contado',
                     'total' => 0.1, // Total fijo de 0.1 Bs para pruebas
                     'estado' => 'pendiente',
                     'cliente_id' => $clienteId,
