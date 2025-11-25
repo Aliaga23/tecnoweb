@@ -37,7 +37,10 @@ class HandleInertiaRequests extends Middleware
     {
         return [
             ...parent::share($request),
-            //
+            'ziggy' => fn () => [
+                ...\Tightenco\Ziggy\Ziggy::generate(),
+                'location' => $request->url(),
+            ],
         ];
     }
 }
