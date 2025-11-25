@@ -119,8 +119,8 @@
                 Resumen del Pago
               </h3>
               <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                <span>Monto QR:</span>
-                <strong style="color: var(--color-primary); font-size: 1.25rem;">Bs. 0.10</strong>
+                <span>Total:</span>
+                <strong style="color: var(--color-primary); font-size: 1.25rem;">Bs. {{ parseFloat(pagoInfo.total).toFixed(2) }}</strong>
               </div>
               <div style="display: flex; justify-content: space-between; font-size: 0.875rem; color: var(--color-text-light);">
                 <span>Número de pago:</span>

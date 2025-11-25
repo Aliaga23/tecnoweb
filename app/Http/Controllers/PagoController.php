@@ -209,22 +209,20 @@ class PagoController extends Controller
                     ]);
                 }
 
-                $pagoId = DB::table('pago')->insertGetId([
-                    'monto' => $total,
-                    'metodo' => 'qr',
-                    'fecha_pago' => now(),
-                    'venta_id' => $ventaId
-                ]);
+            $pagoId = DB::table('pago')->insertGetId([
+                'monto' => $total,
+                'metodo' => 'qr',
+                'fecha_pago' => now(),
+                'venta_id' => $ventaId
+            ]);
 
-                $qrImage = $pagoFacilResponse['values']['qrImage'] ?? null;
-                $transactionId = $pagoFacilResponse['values']['transactionId'] ?? null;
+            $qrImage = $pagoFacilResponse['values']['qrBase64'] ?? null;
+            $transactionId = $pagoFacilResponse['values']['transactionId'] ?? null;
 
-                // Agregar prefijo si la imagen no lo tiene
-                if ($qrImage && !str_starts_with($qrImage, 'data:image')) {
-                    $qrImage = 'data:image/png;base64,' . $qrImage;
-                }
-
-                Cache::put('qr_' . $pagoId, [
+            // Agregar prefijo si la imagen no lo tiene
+            if ($qrImage && !str_starts_with($qrImage, 'data:image')) {
+                $qrImage = 'data:image/png;base64,' . $qrImage;
+            }                Cache::put('qr_' . $pagoId, [
                     'payment_number' => $paymentNumber,
                     'transaction_id' => $transactionId,
                     'qr_image' => $qrImage,
@@ -238,7 +236,7 @@ class PagoController extends Controller
                     'qr_image' => $qrImage,
                     'transaction_id' => $transactionId,
                     'payment_number' => $paymentNumber,
-                    'total' => 0.1
+                    'total' => $totalOriginal
                 ]);
 
             } else {
