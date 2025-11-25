@@ -55,11 +55,11 @@
     <!-- Navbar -->
     <nav class="navbar">
       <div class="container navbar-content">
-        <a href="/" class="navbar-logo">MOTO<span>PARTS</span></a>
+        <a :href="getAppUrl('/')" class="navbar-logo">MOTO<span>PARTS</span></a>
         
         <ul class="navbar-menu">
-          <li><a href="/" class="navbar-link">Inicio</a></li>
-          <li><a href="/catalogo" class="navbar-link">Productos</a></li>
+          <li><a :href="getAppUrl('/')" class="navbar-link">Inicio</a></li>
+          <li><a :href="getAppUrl('/catalogo')" class="navbar-link">Productos</a></li>
           <li><a href="/#categorias" class="navbar-link">Categorías</a></li>
           <li><a href="/#contacto" class="navbar-link">Contacto</a></li>
         </ul>
@@ -72,17 +72,17 @@
                 <User :size="24" />
               </button>
               <div v-if="userMenuOpen" class="user-menu">
-                <a href="/perfil" class="user-menu-item">Mi perfil</a>
-                <a href="/mis-cotizaciones" class="user-menu-item">Mis cotizaciones</a>
+                <a :href="getAppUrl('/perfil')" class="user-menu-item">Mi perfil</a>
+                <a :href="getAppUrl('/mis-cotizaciones')" class="user-menu-item">Mis cotizaciones</a>
                 <button @click="cerrarSesion" class="user-menu-item">Cerrar sesión</button>
               </div>
             </div>
           </template>
           <template v-else>
-            <a href="/register" class="btn btn-secondary">Registrarse</a>
-            <a href="/login" class="btn btn-primary">Ingresar</a>
+            <a :href="getAppUrl('/register')" class="btn btn-secondary">Registrarse</a>
+            <a :href="getAppUrl('/login')" class="btn btn-primary">Ingresar</a>
           </template>
-          <a href="/cart" class="navbar-icon" title="Carrito" style="position: relative;">
+          <a :href="getAppUrl('/cart')" class="navbar-icon" title="Carrito" style="position: relative;">
             <ShoppingCart :size="24" />
             <span v-if="carritoCount > 0" style="position: absolute; top: -8px; right: -8px; background: #ef4444; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold;">{{ carritoCount }}</span>
           </a>
@@ -148,7 +148,7 @@
                 </button>
               </div>
 
-              <a href="/catalogo" class="btn btn-secondary" style="width: 100%; margin-top: 1rem; text-align: center; display: block; text-decoration: none;">
+              <a :href="getAppUrl('/catalogo')" class="btn btn-secondary" style="width: 100%; margin-top: 1rem; text-align: center; display: block; text-decoration: none;">
                 Volver al catálogo
               </a>
             </div>
@@ -157,7 +157,7 @@
 
         <div v-else style="text-align: center; padding: 3rem;">
           <p style="font-size: 1.2rem; color: var(--color-text);">Producto no encontrado</p>
-          <a href="/catalogo" class="btn btn-primary" style="margin-top: 1rem;">Volver al catálogo</a>
+          <a :href="getAppUrl('/catalogo')" class="btn btn-primary" style="margin-top: 1rem;">Volver al catálogo</a>
         </div>
       </div>
     </section>
@@ -185,6 +185,8 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
 import { ShoppingCart, User } from 'lucide-vue-next';
+import { useApi } from '../composables/useApi';
+const { apiFetch, getAppUrl } = useApi();
 
 const props = defineProps({
   productoId: {
@@ -279,7 +281,7 @@ const agregarAlCarrito = () => {
 // Registrar visita
 const registrarVisita = async () => {
   try {
-    const response = await fetch(`/api/visitas/producto-${props.productoId}`, {
+    const response = await apiFetch(`/api/visitas/producto-${props.productoId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
     });
@@ -361,7 +363,7 @@ onMounted(async () => {
   await registrarVisita();
   
   try {
-    const response = await fetch(`/api/catalogo/${props.productoId}`);
+    const response = await apiFetch(`/api/catalogo/${props.productoId}`);
     const data = await response.json();
     if (data.success) {
       producto.value = data.data;

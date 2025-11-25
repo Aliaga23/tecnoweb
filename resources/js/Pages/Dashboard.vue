@@ -55,14 +55,14 @@
     <!-- Navbar -->
     <nav class="navbar">
       <div class="container navbar-content">
-        <a href="/" class="navbar-logo">MOTO<span>PARTS</span></a>
+        <a :href="getAppUrl('/')" class="navbar-logo">MOTO<span>PARTS</span></a>
         
         <ul class="navbar-menu">
-          <li><a href="/dashboard" class="navbar-link">Dashboard</a></li>
-          <li><a href="/dashboard/productos" class="navbar-link">Productos</a></li>
-          <li><a href="/dashboard/categorias" class="navbar-link">Categorías</a></li>
-          <li><a href="/dashboard/usuarios" class="navbar-link">Usuarios</a></li>
-          <li><a href="/dashboard/ventas" class="navbar-link">Ventas</a></li>
+          <li><a :href="getAppUrl('/dashboard')" class="navbar-link">Dashboard</a></li>
+          <li><a :href="getAppUrl('/dashboard/productos')" class="navbar-link">Productos</a></li>
+          <li><a :href="getAppUrl('/dashboard/categorias')" class="navbar-link">Categorías</a></li>
+          <li><a :href="getAppUrl('/dashboard/usuarios')" class="navbar-link">Usuarios</a></li>
+          <li><a :href="getAppUrl('/dashboard/ventas')" class="navbar-link">Ventas</a></li>
         </ul>
 
         <div class="navbar-controls">
@@ -72,7 +72,7 @@
               <User :size="24" />
             </button>
             <div v-if="userMenuOpen" class="user-menu">
-              <a href="/perfil" class="user-menu-item">Mi perfil</a>
+              <a :href="getAppUrl('/perfil')" class="user-menu-item">Mi perfil</a>
               <button @click="cerrarSesion" class="user-menu-item">Cerrar sesión</button>
             </div>
           </div>
@@ -119,6 +119,8 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
 import { User } from 'lucide-vue-next';
+import { useApi } from '../composables/useApi';
+const { apiFetch, getAppUrl } = useApi();
 
 // Accesibilidad
 const accessibilityPanelOpen = ref(false);
@@ -208,21 +210,21 @@ const cargarEstadisticas = async () => {
   
   try {
     // Cargar productos
-    const productosRes = await fetch('/api/productos', {
+    const productosRes = await apiFetch('/api/productos', {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const productosData = await productosRes.json();
     stats.value.productos = productosData.data?.length || 0;
 
     // Cargar categorías
-    const categoriasRes = await fetch('/api/categorias', {
+    const categoriasRes = await apiFetch('/api/categorias', {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const categoriasData = await categoriasRes.json();
     stats.value.categorias = categoriasData.data?.length || 0;
 
     // Cargar usuarios
-    const usuariosRes = await fetch('/api/usuarios', {
+    const usuariosRes = await apiFetch('/api/usuarios', {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const usuariosData = await usuariosRes.json();

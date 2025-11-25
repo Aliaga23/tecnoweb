@@ -55,11 +55,11 @@
     <!-- Navbar -->
     <nav class="navbar">
       <div class="container navbar-content">
-        <a href="/" class="navbar-logo">MOTO<span>PARTS</span></a>
+        <a :href="getAppUrl('/')" class="navbar-logo">MOTO<span>PARTS</span></a>
         
         <ul class="navbar-menu">
-          <li><a href="/" class="navbar-link">Inicio</a></li>
-          <li><a href="/catalogo" class="navbar-link">Productos</a></li>
+          <li><a :href="getAppUrl('/')" class="navbar-link">Inicio</a></li>
+          <li><a :href="getAppUrl('/catalogo')" class="navbar-link">Productos</a></li>
           <li><a href="/#categorias" class="navbar-link">Categorías</a></li>
           <li><a href="/#contacto" class="navbar-link">Contacto</a></li>
         </ul>
@@ -72,17 +72,17 @@
                 <User :size="24" />
               </button>
               <div v-if="userMenuOpen" class="user-menu">
-                <a href="/perfil" class="user-menu-item">Mi perfil</a>
-                <a href="/mis-cotizaciones" class="user-menu-item">Mis cotizaciones</a>
+                <a :href="getAppUrl('/perfil')" class="user-menu-item">Mi perfil</a>
+                <a :href="getAppUrl('/mis-cotizaciones')" class="user-menu-item">Mis cotizaciones</a>
                 <button @click="cerrarSesion" class="user-menu-item">Cerrar sesión</button>
               </div>
             </div>
           </template>
           <template v-else>
-            <a href="/register" class="btn btn-secondary">Registrarse</a>
-            <a href="/login" class="btn btn-primary">Ingresar</a>
+            <a :href="getAppUrl('/register')" class="btn btn-secondary">Registrarse</a>
+            <a :href="getAppUrl('/login')" class="btn btn-primary">Ingresar</a>
           </template>
-          <a href="/cart" class="navbar-icon" title="Carrito" style="position: relative;">
+          <a :href="getAppUrl('/cart')" class="navbar-icon" title="Carrito" style="position: relative;">
             <ShoppingCart :size="24" />
             <span v-if="carritoCount > 0" style="position: absolute; top: -8px; right: -8px; background: #ef4444; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold;">{{ carritoCount }}</span>
           </a>
@@ -108,7 +108,7 @@
           </div>
           <h3 style="font-size: 1.75rem; color: var(--color-text); margin-bottom: 1rem; font-weight: 600;">No tienes cotizaciones</h3>
           <p style="color: var(--color-text-light); margin-bottom: 2.5rem; font-size: 1.125rem;">Crea tu primera cotización desde el catálogo</p>
-          <a href="/catalogo" class="btn btn-primary" style="padding: 1rem 3rem; font-size: 1.125rem;">Explorar catálogo</a>
+          <a :href="getAppUrl('/catalogo')" class="btn btn-primary" style="padding: 1rem 3rem; font-size: 1.125rem;">Explorar catálogo</a>
         </div>
 
         <div v-else class="grid grid-cols-1" style="gap: 1.5rem;">
@@ -145,7 +145,7 @@
 
         <!-- Paginación (si es necesaria después) -->
         <div v-if="cotizaciones.length > 0" style="text-align: center; margin-top: 3rem;">
-          <a href="/catalogo" class="btn btn-secondary">Crear nueva cotización</a>
+          <a :href="getAppUrl('/catalogo')" class="btn btn-secondary">Crear nueva cotización</a>
         </div>
       </div>
     </section>
@@ -173,6 +173,8 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
 import { ShoppingCart, User, FileText, Copy } from 'lucide-vue-next';
+import { useApi } from '../composables/useApi';
+const { apiFetch, getAppUrl } = useApi();
 
 // Estados
 const cotizaciones = ref([]);
@@ -235,7 +237,7 @@ const cargarCotizaciones = async () => {
       return;
     }
 
-    const response = await fetch(`/api/cotizaciones/usuario/${usuario.value.id}`, {
+    const response = await apiFetch(`/api/cotizaciones/usuario/${usuario.value.id}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -267,7 +269,7 @@ const descargarPDF = async (cotizacionId) => {
       return;
     }
 
-    const response = await fetch(`/api/cotizaciones/${cotizacionId}/pdf`, {
+    const response = await apiFetch(`/api/cotizaciones/${cotizacionId}/pdf`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -309,7 +311,7 @@ const duplicarCotizacion = async (cotizacion) => {
 // Registrar visita
 const registrarVisita = async () => {
   try {
-    const response = await fetch('/api/visitas/mis-cotizaciones', {
+    const response = await apiFetch('/api/visitas/mis-cotizaciones', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
     });

@@ -48,14 +48,14 @@
     <!-- Navbar -->
     <nav class="navbar">
       <div class="container navbar-content">
-        <a href="/" class="navbar-logo">MOTO<span>PARTS</span></a>
+        <a :href="getAppUrl('/')" class="navbar-logo">MOTO<span>PARTS</span></a>
         
         <ul class="navbar-menu">
-          <li><a href="/dashboard" class="navbar-link">Dashboard</a></li>
-          <li><a href="/dashboard/productos" class="navbar-link">Productos</a></li>
-          <li><a href="/dashboard/categorias" class="navbar-link">Categorías</a></li>
-          <li><a href="/dashboard/usuarios" class="navbar-link">Usuarios</a></li>
-          <li><a href="/dashboard/ventas" class="navbar-link">Ventas</a></li>
+          <li><a :href="getAppUrl('/dashboard')" class="navbar-link">Dashboard</a></li>
+          <li><a :href="getAppUrl('/dashboard/productos')" class="navbar-link">Productos</a></li>
+          <li><a :href="getAppUrl('/dashboard/categorias')" class="navbar-link">Categorías</a></li>
+          <li><a :href="getAppUrl('/dashboard/usuarios')" class="navbar-link">Usuarios</a></li>
+          <li><a :href="getAppUrl('/dashboard/ventas')" class="navbar-link">Ventas</a></li>
         </ul>
 
         <div class="navbar-controls">
@@ -65,7 +65,7 @@
               <User :size="24" />
             </button>
             <div v-if="userMenuOpen" class="user-menu">
-              <a href="/perfil" class="user-menu-item">Mi perfil</a>
+              <a :href="getAppUrl('/perfil')" class="user-menu-item">Mi perfil</a>
               <button @click="cerrarSesion" class="user-menu-item">Cerrar sesión</button>
             </div>
           </div>
@@ -174,6 +174,8 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
 import { User } from 'lucide-vue-next';
+import { useApi } from '../composables/useApi';
+const { apiFetch, getAppUrl } = useApi();
 
 // Accesibilidad
 const accessibilityPanelOpen = ref(false);
@@ -265,7 +267,7 @@ const form = ref({
 const cargarProductos = async () => {
   const token = localStorage.getItem('token');
   try {
-    const response = await fetch('/api/productos', {
+    const response = await apiFetch('/api/productos', {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const data = await response.json();
@@ -278,7 +280,7 @@ const cargarProductos = async () => {
 const cargarCategorias = async () => {
   const token = localStorage.getItem('token');
   try {
-    const response = await fetch('/api/categorias', {
+    const response = await apiFetch('/api/categorias', {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const data = await response.json();
@@ -326,7 +328,7 @@ const guardar = async () => {
   const method = editando.value ? 'PUT' : 'POST';
 
   try {
-    const response = await fetch(url, {
+    const response = await apiFetch(url, {
       method,
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -353,7 +355,7 @@ const eliminar = async (id) => {
 
   const token = localStorage.getItem('token');
   try {
-    const response = await fetch(`/api/productos/${id}`, {
+    const response = await apiFetch(`/api/productos/${id}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
     });

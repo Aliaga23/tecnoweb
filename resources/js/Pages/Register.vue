@@ -55,10 +55,10 @@
     <!-- Navbar -->
     <nav class="navbar">
       <div class="container navbar-content">
-        <a href="/" class="navbar-logo">MOTO<span>PARTS</span></a>
+        <a :href="getAppUrl('/')" class="navbar-logo">MOTO<span>PARTS</span></a>
         
         <ul class="navbar-menu">
-          <li><a href="/" class="navbar-link">Inicio</a></li>
+          <li><a :href="getAppUrl('/')" class="navbar-link">Inicio</a></li>
           <li><a href="/#productos" class="navbar-link">Productos</a></li>
           <li><a href="/#categorias" class="navbar-link">Categorías</a></li>
           <li><a href="/#contacto" class="navbar-link">Contacto</a></li>
@@ -72,16 +72,16 @@
                 <User :size="24" />
               </button>
               <div v-if="userMenuOpen" class="user-menu">
-                <a href="/perfil" class="user-menu-item">Mi perfil</a>
+                <a :href="getAppUrl('/perfil')" class="user-menu-item">Mi perfil</a>
                 <button @click="cerrarSesion" class="user-menu-item">Cerrar sesión</button>
               </div>
             </div>
           </template>
           <template v-else>
-            <a href="/register" class="btn btn-secondary">Registrarse</a>
-            <a href="/login" class="btn btn-primary">Ingresar</a>
+            <a :href="getAppUrl('/register')" class="btn btn-secondary">Registrarse</a>
+            <a :href="getAppUrl('/login')" class="btn btn-primary">Ingresar</a>
           </template>
-          <a href="/carrito" class="navbar-icon" title="Carrito">
+          <a :href="getAppUrl('/carrito')" class="navbar-icon" title="Carrito">
             <ShoppingCart :size="24" />
           </a>
         </div>
@@ -206,9 +206,9 @@
 
               <div style="text-align: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid var(--color-border);">
                 <p style="color: var(--color-text); margin-bottom: 0.5rem;">
-                  ¿Ya tienes cuenta? <a href="/login" style="color: var(--color-primary); text-decoration: none; font-weight: 600;">Inicia sesión</a>
+                  ¿Ya tienes cuenta? <a :href="getAppUrl('/login')" style="color: var(--color-primary); text-decoration: none; font-weight: 600;">Inicia sesión</a>
                 </p>
-                <a href="/" style="color: var(--color-primary); text-decoration: none; font-weight: 600;">Volver al inicio</a>
+                <a :href="getAppUrl('/')" style="color: var(--color-primary); text-decoration: none; font-weight: 600;">Volver al inicio</a>
               </div>
             </form>
           </div>
@@ -229,6 +229,8 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { ShoppingCart, User } from 'lucide-vue-next';
+import { useApi } from '../composables/useApi';
+const { apiFetch, getAppUrl } = useApi();
 
 // Accesibilidad
 const accessibilityPanelOpen = ref(false);
@@ -321,7 +323,7 @@ const toggleUserMenu = () => {
 
 const registrarVisita = async () => {
   try {
-    const response = await fetch('/api/visitas/register', {
+    const response = await apiFetch('/api/visitas/register', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -355,7 +357,7 @@ const handleRegister = async () => {
   }
 
   try {
-    const response = await fetch('/api/register', {
+    const response = await apiFetch('/api/register', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

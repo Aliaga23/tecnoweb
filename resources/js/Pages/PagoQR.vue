@@ -55,11 +55,11 @@
     <!-- Navbar -->
     <nav class="navbar">
       <div class="container navbar-content">
-        <a href="/" class="navbar-logo">MOTO<span>PARTS</span></a>
+        <a :href="getAppUrl('/')" class="navbar-logo">MOTO<span>PARTS</span></a>
         
         <ul class="navbar-menu">
-          <li><a href="/" class="navbar-link">Inicio</a></li>
-          <li><a href="/catalogo" class="navbar-link">Productos</a></li>
+          <li><a :href="getAppUrl('/')" class="navbar-link">Inicio</a></li>
+          <li><a :href="getAppUrl('/catalogo')" class="navbar-link">Productos</a></li>
           <li><a href="/#categorias" class="navbar-link">Categorías</a></li>
           <li><a href="/#contacto" class="navbar-link">Contacto</a></li>
         </ul>
@@ -72,17 +72,17 @@
                 <User :size="24" />
               </button>
               <div v-if="userMenuOpen" class="user-menu">
-                <a href="/perfil" class="user-menu-item">Mi perfil</a>
-                <a href="/mis-cotizaciones" class="user-menu-item">Mis cotizaciones</a>
+                <a :href="getAppUrl('/perfil')" class="user-menu-item">Mi perfil</a>
+                <a :href="getAppUrl('/mis-cotizaciones')" class="user-menu-item">Mis cotizaciones</a>
                 <button @click="cerrarSesion" class="user-menu-item">Cerrar sesión</button>
               </div>
             </div>
           </template>
           <template v-else>
-            <a href="/register" class="btn btn-secondary">Registrarse</a>
-            <a href="/login" class="btn btn-primary">Ingresar</a>
+            <a :href="getAppUrl('/register')" class="btn btn-secondary">Registrarse</a>
+            <a :href="getAppUrl('/login')" class="btn btn-primary">Ingresar</a>
           </template>
-          <a href="/cart" class="navbar-icon" title="Carrito" style="position: relative;">
+          <a :href="getAppUrl('/cart')" class="navbar-icon" title="Carrito" style="position: relative;">
             <ShoppingCart :size="24" />
           </a>
         </div>
@@ -171,8 +171,8 @@
               <p style="margin: 0;">Tu compra ha sido procesada correctamente</p>
             </div>
             <div style="display: flex; gap: 1rem; justify-content: center;">
-              <a href="/mis-compras" class="btn btn-primary">Ver mis compras</a>
-              <a href="/catalogo" class="btn btn-secondary">Seguir comprando</a>
+              <a :href="getAppUrl('/mis-compras')" class="btn btn-primary">Ver mis compras</a>
+              <a :href="getAppUrl('/catalogo')" class="btn btn-secondary">Seguir comprando</a>
             </div>
           </div>
 
@@ -185,7 +185,7 @@
             </div>
             <div style="display: flex; gap: 1rem; justify-content: center;">
               <button @click="reintentar" class="btn btn-primary">Reintentar</button>
-              <a href="/cart" class="btn btn-secondary">Volver al carrito</a>
+              <a :href="getAppUrl('/cart')" class="btn btn-secondary">Volver al carrito</a>
             </div>
           </div>
 
@@ -195,7 +195,7 @@
               <RefreshCw :size="20" style="margin-right: 0.5rem;" />
               Verificar Estado
             </button>
-            <a href="/cart" class="btn btn-outline">Cancelar</a>
+            <a :href="getAppUrl('/cart')" class="btn btn-outline">Cancelar</a>
           </div>
         </div>
       </div>
@@ -224,6 +224,9 @@
 <script setup>
 import { ref, onMounted, computed, watch, onUnmounted } from 'vue';
 import { ShoppingCart, User, CreditCard, Smartphone, CheckCircle, AlertCircle, RefreshCw } from 'lucide-vue-next';
+import { useApi } from '../composables/useApi';
+
+const { apiFetch, getAppUrl } = useApi();
 
 // Props
 const props = defineProps({
@@ -292,7 +295,7 @@ const generarQR = async () => {
       cliente_email: usuario.value.correo
     };
 
-    const response = await fetch('/api/generar-qr', {
+    const response = await apiFetch('/api/generar-qr', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -359,7 +362,7 @@ const reintentar = () => {
 // Registrar visita
 const registrarVisita = async () => {
   try {
-    const response = await fetch('/api/visitas/pago-qr', {
+    const response = await apiFetch('/api/visitas/pago-qr', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
     });
