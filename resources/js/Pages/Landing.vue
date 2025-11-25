@@ -352,14 +352,14 @@ onMounted(async () => {
   
   try {
     // Cargar productos
-    const responseProductos = await fetch(route('catalogo.index'));
+    const responseProductos = await fetch('/api/catalogo');
     const dataProductos = await responseProductos.json();
     if (dataProductos.success) {
       productos.value = dataProductos.data.slice(0, 8);
     }
 
     // Cargar categorías
-    const responseCategorias = await fetch(route('catalogo.categorias'));
+    const responseCategorias = await fetch('/api/catalogo-categorias');
     const dataCategorias = await responseCategorias.json();
     if (dataCategorias.success) {
       categorias.value = dataCategorias.data;
