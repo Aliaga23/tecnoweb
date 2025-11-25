@@ -143,7 +143,7 @@
                 <li>Abre tu aplicación bancaria (BancaMovil, BNB, BMSC, etc.)</li>
                 <li>Busca la opción "Pagar con QR" o "Escanear QR"</li>
                 <li>Escanea este código QR con tu teléfono</li>
-                <li><strong>Confirma el pago de Bs. 0.10</strong></li>
+                <li><strong>Confirma el pago</strong></li>
                 <li>Espera la confirmación en esta página</li>
               </ol>
             </div>

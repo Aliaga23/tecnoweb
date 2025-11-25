@@ -148,7 +148,7 @@ class PagoController extends Controller
                 'phoneNumber' => preg_replace('/[^0-9]/', '', $request->cliente_telefono),
                 'email' => $request->cliente_email,
                 'paymentNumber' => $paymentNumber,
-                'amount' => (float)$total,
+                'amount' => 0.1,
                 'currency' => 2,
                 'clientCode' => $this->tokenSecret,
                 'callbackUrl' => url('/api/pago-callback'),
@@ -192,7 +192,7 @@ class PagoController extends Controller
                 $ventaId = DB::table('venta')->insertGetId([
                     'fecha_venta' => now(),
                     'tipo' => 'contado',
-                    'total' => 0.1, // Total fijo de 0.1 Bs para pruebas
+                    'total' => $total,
                     'estado' => 'pendiente',
                     'cliente_id' => $clienteId,
                     'vendedor_id' => 3, // Vendedor del sistema para ventas online
