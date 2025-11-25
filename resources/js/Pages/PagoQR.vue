@@ -1,0 +1,458 @@
+<template>
+  <div :class="['app-wrapper', currentTheme, fontSizeClass, { 'high-contrast': highContrast, 'theme-night': isNightMode }]">
+    <!-- Botón de accesibilidad -->
+    <button class="accessibility-toggle" @click="toggleAccessibilityPanel">
+      Accesibilidad
+    </button>
+
+    <!-- Panel de accesibilidad -->
+    <div :class="['accessibility-panel', { active: accessibilityPanelOpen }]">
+      <h3>Configuración de Accesibilidad</h3>
+      
+      <div class="control-group">
+        <label>Tema:</label>
+        <select v-model="currentTheme">
+          <option value="theme-adults">Adultos</option>
+          <option value="theme-young">Jóvenes</option>
+          <option value="theme-kids">Niños</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>Tamaño de fuente: {{ fontSizeLabel }}</label>
+        <input 
+          type="range" 
+          v-model.number="fontSize" 
+          min="12" 
+          max="24" 
+          step="2"
+          style="width: 100%;"
+        >
+      </div>
+
+      <div class="control-group">
+        <label>Alto contraste:</label>
+        <button @click="highContrast = !highContrast">
+          {{ highContrast ? 'Desactivar' : 'Activar' }}
+        </button>
+      </div>
+
+      <div class="control-group">
+        <label>Modo Día/Noche:</label>
+        <button @click="toggleNightMode">
+          {{ isNightMode ? 'Modo Día' : 'Modo Noche' }}
+        </button>
+      </div>
+
+      <div class="control-group">
+        <label>
+          <input type="checkbox" v-model="autoNightMode" style="margin-right: 8px;">
+          Automático (7pm-7am)
+        </label>
+      </div>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+      <div class="container navbar-content">
+        <a href="/" class="navbar-logo">MOTO<span>PARTS</span></a>
+        
+        <ul class="navbar-menu">
+          <li><a href="/" class="navbar-link">Inicio</a></li>
+          <li><a href="/catalogo" class="navbar-link">Productos</a></li>
+          <li><a href="/#categorias" class="navbar-link">Categorías</a></li>
+          <li><a href="/#contacto" class="navbar-link">Contacto</a></li>
+        </ul>
+
+        <div class="navbar-controls">
+          <template v-if="usuario">
+            <span style="color: var(--color-text); margin-right: 1rem;">Bienvenido, {{ usuario.nombre }}</span>
+            <div class="user-menu-container">
+              <button @click="toggleUserMenu" class="navbar-icon" title="Mi cuenta">
+                <User :size="24" />
+              </button>
+              <div v-if="userMenuOpen" class="user-menu">
+                <a href="/perfil" class="user-menu-item">Mi perfil</a>
+                <a href="/mis-cotizaciones" class="user-menu-item">Mis cotizaciones</a>
+                <button @click="cerrarSesion" class="user-menu-item">Cerrar sesión</button>
+              </div>
+            </div>
+          </template>
+          <template v-else>
+            <a href="/register" class="btn btn-secondary">Registrarse</a>
+            <a href="/login" class="btn btn-primary">Ingresar</a>
+          </template>
+          <a href="/cart" class="navbar-icon" title="Carrito" style="position: relative;">
+            <ShoppingCart :size="24" />
+          </a>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Contenido principal -->
+    <section class="section" style="background-color: var(--color-bg-alt); min-height: 80vh; padding: 4rem 0;">
+      <div class="container">
+        <div style="max-width: 600px; margin: 0 auto;">
+          <!-- Header -->
+          <div style="text-align: center; margin-bottom: 3rem;">
+            <h2 class="section-title" style="margin-bottom: 0.5rem;">
+              Pago con <span class="highlight">QR</span>
+            </h2>
+            <p class="section-subtitle" style="margin: 0;">
+              Escanea el código QR con tu app bancaria
+            </p>
+          </div>
+
+          <!-- Estado del pago -->
+          <div v-if="estadoPago === 'procesando'" style="background: var(--color-bg); border-radius: 16px; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); text-align: center; margin-bottom: 2rem;">
+            <div class="loading" style="margin: 0 auto 1rem;"></div>
+            <h3 style="color: var(--color-primary); margin-bottom: 1rem;">Generando código QR...</h3>
+            <p style="color: var(--color-text-light);">Espere un momento por favor</p>
+          </div>
+
+          <!-- QR generado -->
+          <div v-else-if="estadoPago === 'pendiente'" style="background: var(--color-bg); border-radius: 16px; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); text-align: center; margin-bottom: 2rem;">
+            <!-- Información del pago -->
+            <div style="background: var(--color-bg-alt); padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem;">
+              <h3 style="color: var(--color-primary); margin-bottom: 1rem; display: flex; align-items: center; justify-content: center;">
+                <CreditCard :size="24" style="margin-right: 0.5rem;" />
+                Resumen del Pago
+              </h3>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <span>Total de tu compra:</span>
+                <strong style="color: var(--color-primary); font-size: 1.25rem;">Bs. {{ parseFloat(pagoInfo.total).toFixed(2) }}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; color: var(--color-accent);">
+                <span><strong>Monto QR (simbólico):</strong></span>
+                <strong style="color: var(--color-accent); font-size: 1.1rem;">Bs. 0.10</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.875rem; color: var(--color-text-light);">
+                <span>Número de pago:</span>
+                <span>{{ pagoInfo.payment_number }}</span>
+              </div>
+              <div style="background: #fff3cd; color: #856404; padding: 0.75rem; border-radius: 8px; margin-top: 1rem; font-size: 0.875rem; text-align: left;">
+                <strong>Nota:</strong> Por motivos de prueba, el QR mostrará Bs. 0.10, pero tu compra será procesada por el monto total.
+              </div>
+            </div>
+
+            <!-- QR Code -->
+            <div v-if="pagoInfo.qr_image" style="background: white; padding: 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
+              <img :src="pagoInfo.qr_image" alt="Código QR" style="max-width: 300px; width: 100%; height: auto;">
+            </div>
+
+            <!-- Instrucciones -->
+            <div style="text-align: left; background: #f0f8ff; padding: 1.5rem; border-radius: 12px; border-left: 4px solid var(--color-primary); margin-bottom: 2rem;">
+              <h4 style="color: var(--color-primary); margin-bottom: 1rem; display: flex; align-items: center;">
+                <Smartphone :size="20" style="margin-right: 0.5rem;" />
+                Instrucciones de Pago
+              </h4>
+              <ol style="margin: 0; padding-left: 1.25rem; line-height: 1.6;">
+                <li>Abre tu aplicación bancaria (BancaMovil, BNB, BMSC, etc.)</li>
+                <li>Busca la opción "Pagar con QR" o "Escanear QR"</li>
+                <li>Escanea este código QR con tu teléfono</li>
+                <li><strong>Confirma el pago de Bs. 0.10</strong> (monto simbólico para pruebas)</li>
+                <li>Tu compra por el valor real será procesada automáticamente</li>
+                <li>Espera la confirmación en esta página</li>
+              </ol>
+            </div>
+
+            <!-- Estado de verificación -->
+            <div style="display: flex; align-items: center; justify-content: center; gap: 0.75rem; color: var(--color-text-light); margin-bottom: 2rem;">
+              <div class="loading" style="width: 20px; height: 20px;"></div>
+              <span>Esperando confirmación del pago...</span>
+            </div>
+          </div>
+
+          <!-- Pago exitoso -->
+          <div v-else-if="estadoPago === 'completado'" style="background: var(--color-bg); border-radius: 16px; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); text-align: center; margin-bottom: 2rem;">
+            <div style="background: #dcfce7; color: #16a34a; padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem;">
+              <CheckCircle :size="48" style="margin-bottom: 1rem;" />
+              <h3 style="margin-bottom: 0.5rem;">¡Pago Exitoso!</h3>
+              <p style="margin: 0;">Tu compra ha sido procesada correctamente</p>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+              <a href="/mis-compras" class="btn btn-primary">Ver mis compras</a>
+              <a href="/catalogo" class="btn btn-secondary">Seguir comprando</a>
+            </div>
+          </div>
+
+          <!-- Error -->
+          <div v-else-if="estadoPago === 'error'" style="background: var(--color-bg); border-radius: 16px; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); text-align: center; margin-bottom: 2rem;">
+            <div style="background: #fef2f2; color: #dc2626; padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem;">
+              <AlertCircle :size="48" style="margin-bottom: 1rem;" />
+              <h3 style="margin-bottom: 0.5rem;">Error en el Pago</h3>
+              <p style="margin: 0;">{{ errorMessage }}</p>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+              <button @click="reintentar" class="btn btn-primary">Reintentar</button>
+              <a href="/cart" class="btn btn-secondary">Volver al carrito</a>
+            </div>
+          </div>
+
+          <!-- Botones de acción -->
+          <div v-if="estadoPago === 'pendiente'" style="display: flex; gap: 1rem; justify-content: center;">
+            <button @click="verificarEstado" class="btn btn-secondary">
+              <RefreshCw :size="20" style="margin-right: 0.5rem;" />
+              Verificar Estado
+            </button>
+            <a href="/cart" class="btn btn-outline">Cancelar</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <h3 class="footer-title">MOTO<span class="highlight">PARTS</span></h3>
+        <p class="footer-text">Tu mejor opción en repuestos para motos</p>
+        <div class="footer-social">
+          <a href="#">Facebook</a>
+          <a href="#">Instagram</a>
+          <a href="#">WhatsApp</a>
+        </div>
+        <p style="color: #6b7280; font-size: 14px;">&copy; 2025 MotoParts. Todos los derechos reservados.</p>
+        
+        <div class="footer-counter">
+          Visitas en esta página: <strong>{{ contadorVisitas }}</strong>
+        </div>
+      </div>
+    </footer>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, computed, watch, onUnmounted } from 'vue';
+import { ShoppingCart, User, CreditCard, Smartphone, CheckCircle, AlertCircle, RefreshCw } from 'lucide-vue-next';
+
+// Props
+const props = defineProps({
+  carrito: Array,
+  total: Number
+});
+
+// Estados
+const estadoPago = ref('procesando'); // procesando, pendiente, completado, error
+const pagoInfo = ref({});
+const errorMessage = ref('');
+const usuario = ref(null);
+const userMenuOpen = ref(false);
+const contadorVisitas = ref(0);
+const intervalVerificacion = ref(null);
+
+// Verificar si hay usuario logueado
+const usuarioData = localStorage.getItem('user');
+if (usuarioData) {
+  try {
+    usuario.value = JSON.parse(usuarioData);
+  } catch (error) {
+    console.error('Error al parsear usuario:', error);
+  }
+}
+
+const cerrarSesion = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  usuario.value = null;
+  window.location.reload();
+};
+
+const toggleUserMenu = () => {
+  userMenuOpen.value = !userMenuOpen.value;
+};
+
+const generarQR = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.location.href = '/login';
+      return;
+    }
+
+    // Obtener carrito actual
+    const carritoActual = JSON.parse(localStorage.getItem('carrito') || '[]');
+    if (carritoActual.length === 0) {
+      errorMessage.value = 'El carrito está vacío';
+      estadoPago.value = 'error';
+      return;
+    }
+
+    // Calcular total
+    const totalCalculado = carritoActual.reduce((sum, item) => 
+      sum + (item.cantidad * item.costo_unitario), 0
+    );
+
+    const payload = {
+      cliente_id: usuario.value.id,
+      productos: carritoActual,
+      total: totalCalculado,
+      cliente_nombre: `${usuario.value.nombre} ${usuario.value.apellido}`,
+      cliente_ci: usuario.value.ci,
+      cliente_telefono: usuario.value.telefono,
+      cliente_email: usuario.value.correo
+    };
+
+    const response = await fetch('/api/generar-qr', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      pagoInfo.value = data;
+      estadoPago.value = 'pendiente';
+      
+      // Limpiar carrito después de generar QR
+      localStorage.removeItem('carrito');
+      
+      // Iniciar verificación automática cada 5 segundos
+      intervalVerificacion.value = setInterval(verificarEstado, 5000);
+    } else {
+      errorMessage.value = data.error || 'Error al generar QR';
+      estadoPago.value = 'error';
+    }
+
+  } catch (error) {
+    console.error('Error al generar QR:', error);
+    errorMessage.value = 'Error de conexión';
+    estadoPago.value = 'error';
+  }
+};
+
+const verificarEstado = async () => {
+  try {
+    if (!pagoInfo.value.pago_id) return;
+
+    const response = await fetch(`/api/pago-estado/${pagoInfo.value.pago_id}`);
+    const data = await response.json();
+
+    if (data.estado === 'completado') {
+      estadoPago.value = 'completado';
+      if (intervalVerificacion.value) {
+        clearInterval(intervalVerificacion.value);
+      }
+    } else if (data.estado === 'fallido') {
+      errorMessage.value = 'El pago falló. Intenta nuevamente.';
+      estadoPago.value = 'error';
+      if (intervalVerificacion.value) {
+        clearInterval(intervalVerificacion.value);
+      }
+    }
+
+  } catch (error) {
+    console.error('Error al verificar estado:', error);
+  }
+};
+
+const reintentar = () => {
+  estadoPago.value = 'procesando';
+  errorMessage.value = '';
+  pagoInfo.value = {};
+  generarQR();
+};
+
+// Registrar visita
+const registrarVisita = async () => {
+  try {
+    const response = await fetch('/api/visitas/pago-qr', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await response.json();
+    if (data.success) {
+      contadorVisitas.value = data.visitas;
+    }
+  } catch (error) {
+    console.error('Error al registrar visita:', error);
+  }
+};
+
+// Accesibilidad
+const accessibilityPanelOpen = ref(false);
+const currentTheme = ref(localStorage.getItem('theme') || 'theme-adults');
+const fontSize = ref(parseInt(localStorage.getItem('fontSize')) || 16);
+const highContrast = ref(localStorage.getItem('highContrast') === 'true');
+const manualNightMode = ref(localStorage.getItem('manualNightMode') === 'true');
+const autoNightMode = ref(localStorage.getItem('autoNightMode') !== 'false');
+
+const fontSizeLabel = computed(() => {
+  if (fontSize.value <= 14) return 'Pequeño';
+  if (fontSize.value <= 18) return 'Normal';
+  if (fontSize.value <= 22) return 'Grande';
+  return 'Extra Grande';
+});
+
+const fontSizeClass = computed(() => {
+  if (fontSize.value <= 14) return 'font-small';
+  if (fontSize.value <= 18) return '';
+  if (fontSize.value <= 22) return 'font-large';
+  return 'font-xlarge';
+});
+
+const isNightMode = computed(() => {
+  if (!autoNightMode.value) {
+    return manualNightMode.value;
+  }
+  const hour = new Date().getHours();
+  return hour >= 19 || hour < 7;
+});
+
+const toggleAccessibilityPanel = () => {
+  accessibilityPanelOpen.value = !accessibilityPanelOpen.value;
+};
+
+const toggleNightMode = () => {
+  manualNightMode.value = !manualNightMode.value;
+  autoNightMode.value = false;
+  localStorage.setItem('manualNightMode', manualNightMode.value);
+  localStorage.setItem('autoNightMode', 'false');
+};
+
+watch(currentTheme, (newTheme) => {
+  localStorage.setItem('theme', newTheme);
+});
+
+watch(fontSize, (newSize) => {
+  localStorage.setItem('fontSize', newSize);
+  document.documentElement.style.setProperty('--font-size-base', `${newSize}px`);
+});
+
+watch(highContrast, (newValue) => {
+  localStorage.setItem('highContrast', newValue);
+});
+
+watch(autoNightMode, (newValue) => {
+  localStorage.setItem('autoNightMode', newValue);
+  if (newValue) {
+    manualNightMode.value = false;
+    localStorage.setItem('manualNightMode', 'false');
+  }
+});
+
+onMounted(async () => {
+  document.documentElement.style.setProperty('--font-size-base', `${fontSize.value}px`);
+  
+  // Verificar autenticación
+  if (!usuario.value) {
+    window.location.href = '/login';
+    return;
+  }
+  
+  // Registrar visita
+  await registrarVisita();
+  
+  // Generar QR automáticamente
+  await generarQR();
+});
+
+onUnmounted(() => {
+  if (intervalVerificacion.value) {
+    clearInterval(intervalVerificacion.value);
+  }
+});
+</script>

@@ -1,0 +1,117 @@
+<?php
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\UsuarioController;
+use App\Http\Controllers\ProductoController;
+use App\Http\Controllers\CategoriaController;
+use App\Http\Controllers\CatalogoController;
+use App\Http\Controllers\ProveedorController;
+use App\Http\Controllers\CotizacionController;
+use App\Http\Controllers\PagoController;
+
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register API routes for your application. These
+| routes are loaded by the RouteServiceProvider and all of them will
+| be assigned to the "api" middleware group. Make something great!
+|
+*/
+
+// Rutas públicas (sin autenticación)
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login']);
+
+// Catálogo público
+Route::get('/catalogo', [CatalogoController::class, 'index'])->name('catalogo.index');
+Route::get('/catalogo/{id}', [CatalogoController::class, 'show'])->name('catalogo.show');
+Route::get('/catalogo/categoria/{categoria_id}', [CatalogoController::class, 'porCategoria'])->name('catalogo.categoria');
+Route::get('/catalogo-categorias', [CatalogoController::class, 'categorias'])->name('catalogo.categorias');
+
+// Pagos QR PagoFácil
+Route::post('/generar-qr', [PagoController::class, 'generarQR']);
+Route::post('/pago-callback', [PagoController::class, 'callback']);
+Route::get('/pago-estado/{pago_id}', [PagoController::class, 'consultarEstado']);
+
+// Contador de visitas (público)
+Route::post('/visitas/{pagina}', function($pagina) {
+    try {
+        // Verificar si ya existe un registro para esta página
+        $visita = DB::select('SELECT * FROM visitas WHERE pagina = ?', [$pagina]);
+        
+        if (count($visita) > 0) {
+            // Incrementar el contador
+            DB::update('UPDATE visitas SET contador = contador + 1, updated_at = NOW() WHERE pagina = ?', [$pagina]);
+            $resultado = DB::select('SELECT contador FROM visitas WHERE pagina = ?', [$pagina]);
+            $contador = $resultado[0]->contador;
+        } else {
+            // Crear nuevo registro
+            DB::insert('INSERT INTO visitas (pagina, contador, created_at, updated_at) VALUES (?, 1, NOW(), NOW())', [$pagina]);
+            $contador = 1;
+        }
+        
+        return response()->json([
+            'success' => true,
+            'visitas' => $contador
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error al registrar visita: ' . $e->getMessage()
+        ], 500);
+    }
+});
+
+// Rutas protegidas (requieren autenticación JWT)
+Route::middleware('auth:api')->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/me', [AuthController::class, 'me']);
+    Route::post('/refresh', [AuthController::class, 'refresh']);
+    
+    // CRUD de Usuarios (solo Propietario - rol_id = 1)
+    Route::middleware('role:1')->group(function () {
+        Route::get('/usuarios', [UsuarioController::class, 'index']);
+        Route::get('/usuarios/{id}', [UsuarioController::class, 'show']);
+        Route::post('/usuarios', [UsuarioController::class, 'store']);
+        Route::put('/usuarios/{id}', [UsuarioController::class, 'update']);
+        Route::delete('/usuarios/{id}', [UsuarioController::class, 'destroy']);
+    });
+    
+    // CRUD de Productos (Propietario y Vendedor - rol_id = 1,2)
+    Route::middleware('role:1,2')->group(function () {
+        Route::post('/productos', [ProductoController::class, 'store']);
+        Route::put('/productos/{id}', [ProductoController::class, 'update']);
+        Route::delete('/productos/{id}', [ProductoController::class, 'destroy']);
+        
+        // CRUD de Categorías
+        Route::post('/categorias', [CategoriaController::class, 'store']);
+        Route::put('/categorias/{id}', [CategoriaController::class, 'update']);
+        Route::delete('/categorias/{id}', [CategoriaController::class, 'destroy']);
+        
+        // CRUD de Proveedores
+        Route::get('/proveedores', [ProveedorController::class, 'index']);
+        Route::get('/proveedores/{id}', [ProveedorController::class, 'show']);
+        Route::post('/proveedores', [ProveedorController::class, 'store']);
+        Route::put('/proveedores/{id}', [ProveedorController::class, 'update']);
+        Route::delete('/proveedores/{id}', [ProveedorController::class, 'destroy']);
+    });
+    
+    // Ver productos y categorías (todos los roles autenticados)
+    Route::get('/productos', [ProductoController::class, 'index']);
+    Route::get('/productos/{id}', [ProductoController::class, 'show']);
+    Route::get('/categorias', [CategoriaController::class, 'index']);
+    Route::get('/categorias/{id}', [CategoriaController::class, 'show']);
+    
+    // CRUD de Cotizaciones (todos los roles autenticados)
+    Route::get('/cotizaciones', [CotizacionController::class, 'index']);
+    Route::get('/cotizaciones/{id}', [CotizacionController::class, 'show']);
+    Route::post('/cotizaciones', [CotizacionController::class, 'store']);
+    Route::put('/cotizaciones/{id}', [CotizacionController::class, 'update']);
+    Route::delete('/cotizaciones/{id}', [CotizacionController::class, 'destroy']);
+    Route::get('/cotizaciones/usuario/{usuario_id}', [CotizacionController::class, 'porUsuario']);
+    Route::get('/cotizaciones/{id}/pdf', [CotizacionController::class, 'generarPDF']);
+});

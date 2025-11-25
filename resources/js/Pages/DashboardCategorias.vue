@@ -1,0 +1,347 @@
+<template>
+  <div :class="['app-wrapper', currentTheme, fontSizeClass, { 'high-contrast': highContrast, 'theme-night': isNightMode }]">
+    <!-- Botón de accesibilidad -->
+    <button class="accessibility-toggle" @click="toggleAccessibilityPanel">
+      Accesibilidad
+    </button>
+
+    <!-- Panel de accesibilidad -->
+    <div :class="['accessibility-panel', { active: accessibilityPanelOpen }]">
+      <h3>Configuración de Accesibilidad</h3>
+      
+      <div class="control-group">
+        <label>Tema:</label>
+        <select v-model="currentTheme">
+          <option value="theme-adults">Adultos</option>
+          <option value="theme-young">Jóvenes</option>
+          <option value="theme-kids">Niños</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>Tamaño de fuente: {{ fontSizeLabel }}</label>
+        <input type="range" v-model.number="fontSize" min="12" max="24" step="2" style="width: 100%;">
+      </div>
+
+      <div class="control-group">
+        <label>Alto contraste:</label>
+        <button @click="highContrast = !highContrast">
+          {{ highContrast ? 'Desactivar' : 'Activar' }}
+        </button>
+      </div>
+
+      <div class="control-group">
+        <label>Modo Día/Noche:</label>
+        <button @click="toggleNightMode">
+          {{ isNightMode ? 'Modo Día' : 'Modo Noche' }}
+        </button>
+      </div>
+
+      <div class="control-group">
+        <label>
+          <input type="checkbox" v-model="autoNightMode" style="margin-right: 8px;">
+          Automático (7pm-7am)
+        </label>
+      </div>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+      <div class="container navbar-content">
+        <a href="/" class="navbar-logo">MOTO<span>PARTS</span></a>
+        
+        <ul class="navbar-menu">
+          <li><a href="/dashboard" class="navbar-link">Dashboard</a></li>
+          <li><a href="/dashboard/productos" class="navbar-link">Productos</a></li>
+          <li><a href="/dashboard/categorias" class="navbar-link">Categorías</a></li>
+          <li><a href="/dashboard/usuarios" class="navbar-link">Usuarios</a></li>
+          <li><a href="/dashboard/ventas" class="navbar-link">Ventas</a></li>
+        </ul>
+
+        <div class="navbar-controls">
+          <span style="color: var(--color-text); margin-right: 1rem;">{{ usuario?.nombre }}</span>
+          <div class="user-menu-container">
+            <button @click="toggleUserMenu" class="navbar-icon" title="Mi cuenta">
+              <User :size="24" />
+            </button>
+            <div v-if="userMenuOpen" class="user-menu">
+              <a href="/perfil" class="user-menu-item">Mi perfil</a>
+              <button @click="cerrarSesion" class="user-menu-item">Cerrar sesión</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Content -->
+    <section class="section" style="background-color: var(--color-bg);">
+      <div style="padding: 0 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+          <h1 class="section-title" style="margin-bottom: 0;">Gestión de Categorías</h1>
+          <button @click="abrirModalCrear" class="btn btn-primary">Nueva Categoría</button>
+        </div>
+
+        <!-- Tabla -->
+        <div class="card" style="padding: 0; overflow: hidden;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead style="background-color: var(--color-bg-alt);">
+              <tr>
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--color-text);">ID</th>
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--color-text);">Nombre</th>
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--color-text);">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="categoria in categorias" :key="categoria.id" style="border-top: 1px solid var(--color-border);">
+                <td style="padding: 1rem; color: var(--color-text);">{{ categoria.id }}</td>
+                <td style="padding: 1rem; color: var(--color-text);">{{ categoria.nombre }}</td>
+                <td style="padding: 1rem;">
+                  <button @click="abrirModalEditar(categoria)" style="color: var(--color-primary); background: none; border: none; cursor: pointer; margin-right: 1rem;">Editar</button>
+                  <button @click="eliminar(categoria.id)" style="color: var(--color-primary); background: none; border: none; cursor: pointer;">Eliminar</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Modal Crear/Editar -->
+    <div v-if="modalAbierto" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;">
+      <div class="card" style="width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto;">
+        <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--color-text); margin-bottom: 1.5rem;">
+          {{ editando ? 'Editar Categoría' : 'Nueva Categoría' }}
+        </h2>
+
+        <form @submit.prevent="guardar">
+          <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label>Nombre</label>
+            <input v-model="form.nombre" type="text" required class="form-input">
+          </div>
+
+          <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+            <button type="button" @click="cerrarModal" class="btn btn-secondary">Cancelar</button>
+            <button type="submit" class="btn btn-primary">{{ editando ? 'Actualizar' : 'Crear' }}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <p>&copy; 2025 MotoParts. Todos los derechos reservados.</p>
+      </div>
+    </footer>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, watch, onMounted } from 'vue';
+import { User } from 'lucide-vue-next';
+
+// Accesibilidad
+const accessibilityPanelOpen = ref(false);
+const currentTheme = ref(localStorage.getItem('theme') || 'theme-adults');
+const fontSize = ref(parseInt(localStorage.getItem('fontSize')) || 16);
+const highContrast = ref(localStorage.getItem('highContrast') === 'true');
+const manualNightMode = ref(localStorage.getItem('manualNightMode') === 'true');
+const autoNightMode = ref(localStorage.getItem('autoNightMode') !== 'false');
+
+const fontSizeLabel = computed(() => {
+  if (fontSize.value <= 14) return 'Pequeño';
+  if (fontSize.value <= 18) return 'Normal';
+  if (fontSize.value <= 22) return 'Grande';
+  return 'Extra Grande';
+});
+
+const fontSizeClass = computed(() => {
+  if (fontSize.value <= 14) return 'font-small';
+  if (fontSize.value <= 18) return '';
+  if (fontSize.value <= 22) return 'font-large';
+  return 'font-xlarge';
+});
+
+const isNightMode = computed(() => {
+  if (!autoNightMode.value) return manualNightMode.value;
+  const hora = new Date().getHours();
+  return hora >= 19 || hora < 7;
+});
+
+const toggleNightMode = () => {
+  if (autoNightMode.value) {
+    autoNightMode.value = false;
+    manualNightMode.value = !isNightMode.value;
+  } else {
+    manualNightMode.value = !manualNightMode.value;
+  }
+};
+
+const toggleAccessibilityPanel = () => {
+  accessibilityPanelOpen.value = !accessibilityPanelOpen.value;
+};
+
+watch(currentTheme, (val) => localStorage.setItem('theme', val));
+watch(fontSize, (val) => localStorage.setItem('fontSize', val.toString()));
+watch(highContrast, (val) => localStorage.setItem('highContrast', val));
+watch(manualNightMode, (val) => localStorage.setItem('manualNightMode', val));
+watch(autoNightMode, (val) => localStorage.setItem('autoNightMode', val));
+
+// Usuario
+const usuario = ref(null);
+const userMenuOpen = ref(false);
+
+const usuarioData = localStorage.getItem('user');
+if (usuarioData) {
+  try {
+    usuario.value = JSON.parse(usuarioData);
+  } catch (error) {
+    window.location.href = '/login';
+  }
+} else {
+  window.location.href = '/login';
+}
+
+const toggleUserMenu = () => {
+  userMenuOpen.value = !userMenuOpen.value;
+};
+
+const cerrarSesion = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  window.location.href = '/';
+};
+
+// CRUD
+const categorias = ref([]);
+const modalAbierto = ref(false);
+const editando = ref(false);
+const form = ref({
+  id: null,
+  nombre: ''
+});
+
+const cargarCategorias = async () => {
+  const token = localStorage.getItem('token');
+  try {
+    const response = await fetch('/api/categorias', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await response.json();
+    categorias.value = data.data || [];
+  } catch (error) {
+    console.error('Error al cargar categorías:', error);
+  }
+};
+
+const abrirModalCrear = () => {
+  editando.value = false;
+  form.value = {
+    id: null,
+    nombre: ''
+  };
+  modalAbierto.value = true;
+};
+
+const abrirModalEditar = (categoria) => {
+  editando.value = true;
+  form.value = {
+    id: categoria.id,
+    nombre: categoria.nombre
+  };
+  modalAbierto.value = true;
+};
+
+const cerrarModal = () => {
+  modalAbierto.value = false;
+};
+
+const guardar = async () => {
+  const token = localStorage.getItem('token');
+  const url = editando.value ? `/api/categorias/${form.value.id}` : '/api/categorias';
+  const method = editando.value ? 'PUT' : 'POST';
+
+  try {
+    const response = await fetch(url, {
+      method,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(form.value)
+    });
+
+    if (response.ok) {
+      alert(editando.value ? 'Categoría actualizada' : 'Categoría creada');
+      cerrarModal();
+      cargarCategorias();
+    } else {
+      alert('Error al guardar categoría');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Error al guardar categoría');
+  }
+};
+
+const eliminar = async (id) => {
+  if (!confirm('¿Estás seguro de eliminar esta categoría?')) return;
+
+  const token = localStorage.getItem('token');
+  try {
+    const response = await fetch(`/api/categorias/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (response.ok) {
+      alert('Categoría eliminada');
+      cargarCategorias();
+    } else {
+      alert('Error al eliminar categoría');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Error al eliminar categoría');
+  }
+};
+
+onMounted(() => {
+  cargarCategorias();
+});
+</script>
+
+<style scoped>
+.app-wrapper {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-wrapper > section {
+  flex: 1;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid var(--color-border);
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+</style>
