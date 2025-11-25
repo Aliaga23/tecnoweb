@@ -43,47 +43,65 @@ class PagoController extends Controller
 
             // Preparar detalles de orden para PagoFácil
             $orderDetail = [];
-            $serial = 1;
             
             foreach ($productos as $producto) {
                 $orderDetail[] = [
-                    'serial' => $serial++,
-                    'product' => $producto['nombre'],
-                    'quantity' => $producto['cantidad'],
-                    'price' => (float)$producto['costo_unitario'],
-                    'discount' => 0,
-                    'total' => (float)($producto['cantidad'] * $producto['costo_unitario'])
+                    'Serial' => count($orderDetail) + 1,
+                    'Producto' => $producto['nombre'],
+                    'Cantidad' => (int)$producto['cantidad'],
+                    'Precio' => (float)$producto['costo_unitario'],
+                    'Descuento' => 0,
+                    'Total' => (float)($producto['cantidad'] * $producto['costo_unitario'])
                 ];
             }
 
-            // Preparar payload para PagoFácil
+            // Preparar payload para PagoFácil según documentación
             $payload = [
-                'paymentMethod' => 4, // QR
-                'clientName' => $request->cliente_nombre,
-                'documentType' => 1, // CI
-                'documentId' => $request->cliente_ci,
-                'phoneNumber' => $request->cliente_telefono,
-                'email' => $request->cliente_email,
-                'paymentNumber' => $paymentNumber,
-                'amount' => (float)$total,
-                'currency' => 2, // BOB (Bolivianos)
-                'clientCode' => '11001', // Código de cliente (puedes cambiarlo)
-                'callbackUrl' => url('/api/pago-callback'),
-                'orderDetail' => $orderDetail
+                'tcCommerceID' => $this->tokenSecret, // Token Secret (Commerce ID)
+                'tnMoneda' => 2, // BOB
+                'tnTelefono' => (int)preg_replace('/[^0-9]/', '', $request->cliente_telefono),
+                'tcNombreUsuario' => $request->cliente_nombre,
+                'tnCiNit' => (int)preg_replace('/[^0-9]/', '', $request->cliente_ci),
+                'tcNroPago' => $paymentNumber,
+                'tnMontoClienteEmpresa' => (float)$total,
+                'tcCorreo' => $request->cliente_email,
+                'tcUrlCallBack' => url('/api/pago-callback'),
+                'taPedidoDetalle' => $orderDetail
             ];
 
-            // Headers para la petición
+            // Headers para la petición según documentación PagoFácil
+            // El TokenService va en el header como autenticación
             $headers = [
+                'Accept' => 'application/json',
                 'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . $this->tokenService
+                'TokenService' => $this->tokenService
             ];
 
             // Hacer petición a PagoFácil
             $response = Http::withHeaders($headers)
+                ->timeout(30)
                 ->post($this->apiUrl, $payload);
+
+            \Log::info('PagoFácil Request:', [
+                'url' => $this->apiUrl,
+                'payload' => $payload
+            ]);
+
+            \Log::info('PagoFácil Response:', [
+                'status' => $response->status(),
+                'body' => $response->json()
+            ]);
 
             if ($response->successful()) {
                 $pagoFacilResponse = $response->json();
+                
+                // Verificar si hay error en la respuesta
+                if (isset($pagoFacilResponse['error']) && $pagoFacilResponse['error'] != 0) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Error de PagoFácil: ' . ($pagoFacilResponse['message'] ?? 'Error desconocido')
+                    ], 400);
+                }
                 
                 // Primero crear la venta pendiente
                 $ventaId = DB::table('venta')->insertGetId([
@@ -119,8 +137,8 @@ class PagoController extends Controller
                 cache([
                     'qr_' . $pagoId => [
                         'payment_number' => $paymentNumber,
-                        'transaction_id' => $pagoFacilResponse['transactionId'] ?? null,
-                        'qr_url' => $pagoFacilResponse['qrUrl'] ?? null,
+                        'transaction_id' => $pagoFacilResponse['values']['transactionId'] ?? null,
+                        'qr_url' => $pagoFacilResponse['values']['qrImage'] ?? null,
                         'venta_id' => $ventaId,
                         'productos' => $productos
                     ]
@@ -129,9 +147,9 @@ class PagoController extends Controller
                 return response()->json([
                     'success' => true,
                     'pago_id' => $pagoId,
-                    'qr_url' => $pagoFacilResponse['qrUrl'] ?? null,
-                    'qr_image' => $pagoFacilResponse['qrImage'] ?? null,
-                    'transaction_id' => $pagoFacilResponse['transactionId'] ?? null,
+                    'qr_url' => $pagoFacilResponse['values']['qrImage'] ?? null,
+                    'qr_image' => $pagoFacilResponse['values']['qrImage'] ?? null,
+                    'transaction_id' => $pagoFacilResponse['values']['transactionId'] ?? null,
                     'payment_number' => $paymentNumber,
                     'total' => $total
                 ]);
