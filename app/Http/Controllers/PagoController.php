@@ -219,6 +219,11 @@ class PagoController extends Controller
                 $qrImage = $pagoFacilResponse['values']['qrImage'] ?? null;
                 $transactionId = $pagoFacilResponse['values']['transactionId'] ?? null;
 
+                // Agregar prefijo si la imagen no lo tiene
+                if ($qrImage && !str_starts_with($qrImage, 'data:image')) {
+                    $qrImage = 'data:image/png;base64,' . $qrImage;
+                }
+
                 Cache::put('qr_' . $pagoId, [
                     'payment_number' => $paymentNumber,
                     'transaction_id' => $transactionId,
@@ -231,10 +236,9 @@ class PagoController extends Controller
                     'success' => true,
                     'pago_id' => $pagoId,
                     'qr_image' => $qrImage,
-                    'qr_url' => $qrImage,
                     'transaction_id' => $transactionId,
                     'payment_number' => $paymentNumber,
-                    'total' => $total
+                    'total' => 0.1
                 ]);
 
             } else {

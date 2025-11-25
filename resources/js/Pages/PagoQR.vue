@@ -119,19 +119,12 @@
                 Resumen del Pago
               </h3>
               <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                <span>Total de tu compra:</span>
-                <strong style="color: var(--color-primary); font-size: 1.25rem;">Bs. {{ parseFloat(pagoInfo.total).toFixed(2) }}</strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; color: var(--color-accent);">
-                <span><strong>Monto QR (simbólico):</strong></span>
-                <strong style="color: var(--color-accent); font-size: 1.1rem;">Bs. 0.10</strong>
+                <span>Monto QR:</span>
+                <strong style="color: var(--color-primary); font-size: 1.25rem;">Bs. 0.10</strong>
               </div>
               <div style="display: flex; justify-content: space-between; font-size: 0.875rem; color: var(--color-text-light);">
                 <span>Número de pago:</span>
                 <span>{{ pagoInfo.payment_number }}</span>
-              </div>
-              <div style="background: #fff3cd; color: #856404; padding: 0.75rem; border-radius: 8px; margin-top: 1rem; font-size: 0.875rem; text-align: left;">
-                <strong>Nota:</strong> Por motivos de prueba, el QR mostrará Bs. 0.10, pero tu compra será procesada por el monto total.
               </div>
             </div>
 
@@ -146,12 +139,11 @@
                 <Smartphone :size="20" style="margin-right: 0.5rem;" />
                 Instrucciones de Pago
               </h4>
-              <ol style="margin: 0; padding-left: 1.25rem; line-height: 1.6;">
+              <ol style="text-align: left; padding-left: 1.5rem; margin: 0;">
                 <li>Abre tu aplicación bancaria (BancaMovil, BNB, BMSC, etc.)</li>
                 <li>Busca la opción "Pagar con QR" o "Escanear QR"</li>
                 <li>Escanea este código QR con tu teléfono</li>
-                <li><strong>Confirma el pago de Bs. 0.10</strong> (monto simbólico para pruebas)</li>
-                <li>Tu compra por el valor real será procesada automáticamente</li>
+                <li><strong>Confirma el pago de Bs. 0.10</strong></li>
                 <li>Espera la confirmación en esta página</li>
               </ol>
             </div>
