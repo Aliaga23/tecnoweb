@@ -371,7 +371,7 @@ const handleRegister = async () => {
     if (response.ok && data.success) {
       successMessage.value = 'Registro exitoso. Redirigiendo...';
       setTimeout(() => {
-        window.location.href = '/login';
+        window.location.href = getAppUrl('/login');
       }, 2000);
     } else {
       errorMessage.value = data.message || 'Error al registrar. Por favor intenta nuevamente.';

@@ -295,9 +295,9 @@ const handleLogin = async () => {
       setTimeout(() => {
         const rolNombre = data.data.usuario.rol?.nombre || data.data.usuario.rol;
         if (rolNombre === 'Propietario' || rolNombre === 'Vendedor') {
-          window.location.href = '/dashboard';
+          window.location.href = getAppUrl('/dashboard');
         } else {
-          window.location.href = '/';
+          window.location.href = getAppUrl('/');
         }
       }, 1500);
     } else {

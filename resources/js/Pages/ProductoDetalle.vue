@@ -275,7 +275,7 @@ const agregarAlCarrito = () => {
   
   localStorage.setItem('carrito', JSON.stringify(carrito.value));
   alert('Producto agregado al carrito');
-  window.location.href = '/catalogo';
+  window.location.href = getAppUrl('/catalogo');
 };
 
 // Registrar visita

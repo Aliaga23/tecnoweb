@@ -304,7 +304,7 @@ const generarCotizacion = async () => {
     const token = localStorage.getItem('token');
     if (!token) {
       alert('Debes iniciar sesión para generar una cotización');
-      window.location.href = '/login';
+      window.location.href = getAppUrl('/login');
       return;
     }
 
@@ -332,7 +332,7 @@ const generarCotizacion = async () => {
       alert('Cotización generada exitosamente');
       carrito.value = [];
       localStorage.setItem('carrito', JSON.stringify(carrito.value));
-      window.location.href = '/mis-cotizaciones';
+      window.location.href = getAppUrl('/mis-cotizaciones');
     } else {
       alert('Error al generar cotización: ' + (data.error || 'Error desconocido'));
     }
@@ -347,7 +347,7 @@ const generarVenta = () => {
   // Verificar autenticación
   if (!usuario.value) {
     alert('Debes iniciar sesión para comprar');
-    window.location.href = '/login';
+    window.location.href = getAppUrl('/login');
     return;
   }
 
@@ -358,7 +358,7 @@ const generarVenta = () => {
   }
 
   // Redirigir a la página de pago QR
-  window.location.href = '/pago-qr';
+  window.location.href = getAppUrl('/pago-qr');
 };
 
 // Registrar visita

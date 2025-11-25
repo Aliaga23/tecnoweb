@@ -268,7 +268,7 @@ const generarQR = async () => {
   try {
     const token = localStorage.getItem('token');
     if (!token) {
-      window.location.href = '/login';
+      window.location.href = getAppUrl('/login');
       return;
     }
 
@@ -442,7 +442,7 @@ onMounted(async () => {
   
   // Verificar autenticación
   if (!usuario.value) {
-    window.location.href = '/login';
+    window.location.href = getAppUrl('/login');
     return;
   }
   

@@ -409,7 +409,7 @@ const generarCotizacion = async () => {
     const token = localStorage.getItem('token');
     if (!token) {
       alert('Debes iniciar sesión para generar una cotización');
-      window.location.href = '/login';
+      window.location.href = getAppUrl('/login');
       return;
     }
 
@@ -438,7 +438,7 @@ const generarCotizacion = async () => {
       carrito.value = [];
       localStorage.setItem('carrito', JSON.stringify(carrito.value));
       showCarrito.value = false;
-      window.location.href = '/mis-cotizaciones';
+      window.location.href = getAppUrl('/mis-cotizaciones');
     } else {
       alert('Error al generar cotización: ' + (data.error || 'Error desconocido'));
     }

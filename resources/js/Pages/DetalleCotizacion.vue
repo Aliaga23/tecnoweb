@@ -314,7 +314,7 @@ const cargarDetalleCotizacion = async () => {
   try {
     const token = localStorage.getItem('token');
     if (!token) {
-      window.location.href = '/login';
+      window.location.href = getAppUrl('/login');
       return;
     }
 
@@ -405,7 +405,7 @@ const duplicarCotizacion = () => {
 };
 
 const crearNuevaCotizacion = () => {
-  window.location.href = '/catalogo';
+  window.location.href = getAppUrl('/catalogo');
 };
 
 // Registrar visita
@@ -491,7 +491,7 @@ onMounted(async () => {
   
   // Verificar autenticación
   if (!usuario.value) {
-    window.location.href = '/login';
+    window.location.href = getAppUrl('/login');
     return;
   }
   

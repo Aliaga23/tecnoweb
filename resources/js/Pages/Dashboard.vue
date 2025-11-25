@@ -181,10 +181,10 @@ if (usuarioData) {
     usuario.value = JSON.parse(usuarioData);
   } catch (error) {
     console.error('Error al parsear usuario:', error);
-    window.location.href = '/login';
+    window.location.href = getAppUrl('/login');
   }
 } else {
-  window.location.href = '/login';
+  window.location.href = getAppUrl('/login');
 }
 
 const toggleUserMenu = () => {
@@ -194,7 +194,7 @@ const toggleUserMenu = () => {
 const cerrarSesion = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
-  window.location.href = '/';
+  window.location.href = getAppUrl('/');
 };
 
 // Estadísticas
