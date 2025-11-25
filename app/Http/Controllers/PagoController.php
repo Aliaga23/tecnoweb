@@ -85,7 +85,13 @@ class PagoController extends Controller
 
             \Log::info('PagoFácil Request:', [
                 'url' => $this->apiUrl,
-                'payload' => $payload
+                'headers' => [
+                    'Authorization' => 'Bearer ' . substr($this->tokenService, 0, 50) . '...',
+                    'Content-Type' => $headers['Content-Type'],
+                    'Accept' => $headers['Accept']
+                ],
+                'payload' => $payload,
+                'token_length' => strlen($this->tokenService)
             ]);
 
             \Log::info('PagoFácil Response:', [
