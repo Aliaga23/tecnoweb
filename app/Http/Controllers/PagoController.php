@@ -211,7 +211,7 @@ class PagoController extends Controller
 
                 $pagoId = DB::table('pago')->insertGetId([
                     'monto' => $total,
-                    'metodo' => 'QR_PagoFacil',
+                    'metodo' => 'qr',
                     'fecha_pago' => now(),
                     'venta_id' => $ventaId
                 ]);
