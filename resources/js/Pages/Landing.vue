@@ -55,11 +55,11 @@
     <!-- Navbar -->
     <nav class="navbar">
       <div class="container navbar-content">
-        <a href="/" class="navbar-logo">MOTO<span>PARTS</span></a>
+        <a :href="getAppUrl('/')" class="navbar-logo">MOTO<span>PARTS</span></a>
         
         <ul class="navbar-menu">
-          <li><a href="/" class="navbar-link">Inicio</a></li>
-          <li><a href="/catalogo" class="navbar-link">Productos</a></li>
+          <li><a :href="getAppUrl('/')" class="navbar-link">Inicio</a></li>
+          <li><a :href="getAppUrl('/catalogo')" class="navbar-link">Productos</a></li>
           <li><a href="#categorias" class="navbar-link">Categorías</a></li>
           <li><a href="#contacto" class="navbar-link">Contacto</a></li>
         </ul>
@@ -72,17 +72,17 @@
                 <User :size="24" />
               </button>
               <div v-if="userMenuOpen" class="user-menu">
-                <a href="/perfil" class="user-menu-item">Mi perfil</a>
-                <a href="/mis-cotizaciones" class="user-menu-item">Mis cotizaciones</a>
+                <a :href="getAppUrl('/perfil')" class="user-menu-item">Mi perfil</a>
+                <a :href="getAppUrl('/mis-cotizaciones')" class="user-menu-item">Mis cotizaciones</a>
                 <button @click="cerrarSesion" class="user-menu-item">Cerrar sesión</button>
               </div>
             </div>
           </template>
           <template v-else>
-            <a href="/register" class="btn btn-secondary">Registrarse</a>
-            <a href="/login" class="btn btn-primary">Ingresar</a>
+            <a :href="getAppUrl('/register')" class="btn btn-secondary">Registrarse</a>
+            <a :href="getAppUrl('/login')" class="btn btn-primary">Ingresar</a>
           </template>
-          <a href="/cart" class="navbar-icon" title="Carrito" style="position: relative;">
+          <a :href="getAppUrl('/cart')" class="navbar-icon" title="Carrito" style="position: relative;">
             <ShoppingCart :size="24" />
             <span v-if="carritoCount > 0" style="position: absolute; top: -8px; right: -8px; background: #ef4444; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold;">{{ carritoCount }}</span>
           </a>
@@ -231,6 +231,9 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
 import { ShoppingCart, Phone, Mail, MapPin, User } from 'lucide-vue-next';
+import { useApi } from '../composables/useApi';
+
+const { apiFetch, getAppUrl } = useApi();
 
 // Estados
 const menuAbierto = ref(false);
@@ -333,7 +336,7 @@ const toggleAccessibilityPanel = () => {
 // Registrar visita
 const registrarVisita = async () => {
   try {
-    const response = await fetch('/api/visitas/landing', {
+    const response = await apiFetch('/api/visitas/landing', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
     });
@@ -352,14 +355,14 @@ onMounted(async () => {
   
   try {
     // Cargar productos
-    const responseProductos = await fetch('/api/catalogo');
+    const responseProductos = await apiFetch('/api/catalogo');
     const dataProductos = await responseProductos.json();
     if (dataProductos.success) {
       productos.value = dataProductos.data.slice(0, 8);
     }
 
     // Cargar categorías
-    const responseCategorias = await fetch('/api/catalogo-categorias');
+    const responseCategorias = await apiFetch('/api/catalogo-categorias');
     const dataCategorias = await responseCategorias.json();
     if (dataCategorias.success) {
       categorias.value = dataCategorias.data;
