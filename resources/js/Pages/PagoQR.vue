@@ -326,12 +326,12 @@ const verificarEstado = async () => {
     const response = await apiFetch(`/api/pago-estado/${pagoInfo.value.pago_id}`);
     const data = await response.json();
 
-    if (data.estado === 'completado') {
+    if (data.estado === 'pagada') {
       estadoPago.value = 'completado';
       if (intervalVerificacion.value) {
         clearInterval(intervalVerificacion.value);
       }
-    } else if (data.estado === 'fallido') {
+    } else if (data.estado === 'fallido' || data.estado === 'pendiente') {
       errorMessage.value = 'El pago falló. Intenta nuevamente.';
       estadoPago.value = 'error';
       if (intervalVerificacion.value) {
