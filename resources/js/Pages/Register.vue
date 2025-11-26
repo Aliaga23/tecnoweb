@@ -55,7 +55,7 @@
     <!-- Navbar -->
     <nav class="navbar">
       <div class="container navbar-content">
-        <a :href="getAppUrl('/')" class="navbar-logo">MOTO<span>PARTS</span></a>
+        <a :href="getAppUrl('/')" class="navbar-logo">ELYTA</a>
         
         <ul class="navbar-menu">
           <li><a :href="getAppUrl('/')" class="navbar-link">Inicio</a></li>
@@ -73,6 +73,9 @@
               </button>
               <div v-if="userMenuOpen" class="user-menu">
                 <a :href="getAppUrl('/perfil')" class="user-menu-item">Mi perfil</a>
+                <a :href="getAppUrl('/mis-cotizaciones')" class="user-menu-item">Mis cotizaciones</a>
+                <a :href="getAppUrl('/mis-compras')" class="user-menu-item">Mis compras</a>
+                <a :href="getAppUrl('/mis-devoluciones')" class="user-menu-item">Mis devoluciones</a>
                 <button @click="cerrarSesion" class="user-menu-item">Cerrar sesión</button>
               </div>
             </div>
@@ -219,8 +222,18 @@
     <!-- Footer -->
     <footer class="footer">
       <div class="container">
-        <p>&copy; 2025 MotoParts. Todos los derechos reservados.</p>
-        <p class="footer-counter">Visitas: {{ contadorVisitas }}</p>
+        <h3 class="footer-title">ELYTA</h3>
+        <p class="footer-text">Tu mejor opción en repuestos para motos</p>
+        <div class="footer-social">
+          <a href="#">Facebook</a>
+          <a href="#">Instagram</a>
+          <a href="#">WhatsApp</a>
+        </div>
+        <p style="color: #6b7280; font-size: 14px;">&copy; 2025 ELYTA. Todos los derechos reservados.</p>
+        
+        <div class="footer-counter">
+          Visitas en esta página: <strong>{{ contadorVisitas }}</strong>
+        </div>
       </div>
     </footer>
   </div>
@@ -324,10 +337,7 @@ const toggleUserMenu = () => {
 const registrarVisita = async () => {
   try {
     const response = await apiFetch('/api/visitas/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      }
+      method: 'POST'
     });
     const data = await response.json();
     contadorVisitas.value = data.visitas || 0;
@@ -360,7 +370,6 @@ const handleRegister = async () => {
     const response = await apiFetch('/api/register', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
       body: JSON.stringify(form.value)

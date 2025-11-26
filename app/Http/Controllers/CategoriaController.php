@@ -3,18 +3,15 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use App\Models\Categoria;
 
 class CategoriaController extends Controller
 {
-    /**
-     * Listar todas las categorías
-     */
     public function index()
     {
         try {
-            $categorias = DB::select('SELECT * FROM categoria ORDER BY id');
+            $categorias = Categoria::obtenerTodas();
 
             return response()->json([
                 'success' => true,
@@ -30,15 +27,12 @@ class CategoriaController extends Controller
         }
     }
 
-    /**
-     * Obtener una categoría por ID
-     */
     public function show($id)
     {
         try {
-            $categorias = DB::select('SELECT * FROM categoria WHERE id = ? LIMIT 1', [$id]);
+            $categoria = Categoria::obtenerPorId($id);
 
-            if (empty($categorias)) {
+            if (!$categoria) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Categoría no encontrada'
@@ -47,7 +41,7 @@ class CategoriaController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $categorias[0]
+                'data' => $categoria
             ], 200);
 
         } catch (\Exception $e) {
@@ -64,11 +58,18 @@ class CategoriaController extends Controller
      */
     public function store(Request $request)
     {
+        // Validación personalizada usando el modelo
+        if (Categoria::existeNombreExcepto($request->nombre)) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['nombre' => ['Ya existe una categoría con ese nombre']]
+            ], 422);
+        }
+
         $validator = Validator::make($request->all(), [
-            'nombre' => 'required|string|max:255|unique:categoria,nombre'
+            'nombre' => 'required|string|max:255'
         ], [
-            'nombre.required' => 'El nombre es obligatorio',
-            'nombre.unique' => 'Ya existe una categoría con ese nombre'
+            'nombre.required' => 'El nombre es obligatorio'
         ]);
 
         if ($validator->fails()) {
@@ -79,12 +80,7 @@ class CategoriaController extends Controller
         }
 
         try {
-            DB::insert('INSERT INTO categoria (nombre) VALUES (?)', [$request->nombre]);
-
-            $categoria = DB::select(
-                'SELECT * FROM categoria WHERE nombre = ? ORDER BY id DESC LIMIT 1',
-                [$request->nombre]
-            )[0];
+            $categoria = Categoria::crearNueva($request->nombre);
 
             return response()->json([
                 'success' => true,
@@ -106,20 +102,27 @@ class CategoriaController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $categorias = DB::select('SELECT * FROM categoria WHERE id = ? LIMIT 1', [$id]);
+        $categoria = Categoria::obtenerPorId($id);
         
-        if (empty($categorias)) {
+        if (!$categoria) {
             return response()->json([
                 'success' => false,
                 'message' => 'Categoría no encontrada'
             ], 404);
         }
 
+        // Validación personalizada usando el modelo
+        if (Categoria::existeNombreExcepto($request->nombre, $id)) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['nombre' => ['Ya existe una categoría con ese nombre']]
+            ], 422);
+        }
+
         $validator = Validator::make($request->all(), [
-            'nombre' => 'required|string|max:255|unique:categoria,nombre,' . $id
+            'nombre' => 'required|string|max:255'
         ], [
-            'nombre.required' => 'El nombre es obligatorio',
-            'nombre.unique' => 'Ya existe una categoría con ese nombre'
+            'nombre.required' => 'El nombre es obligatorio'
         ]);
 
         if ($validator->fails()) {
@@ -130,9 +133,7 @@ class CategoriaController extends Controller
         }
 
         try {
-            DB::update('UPDATE categoria SET nombre = ? WHERE id = ?', [$request->nombre, $id]);
-
-            $categoriaActualizada = DB::select('SELECT * FROM categoria WHERE id = ? LIMIT 1', [$id])[0];
+            $categoriaActualizada = Categoria::actualizarPorId($id, $request->nombre);
 
             return response()->json([
                 'success' => true,
@@ -155,9 +156,9 @@ class CategoriaController extends Controller
     public function destroy($id)
     {
         try {
-            $categorias = DB::select('SELECT * FROM categoria WHERE id = ? LIMIT 1', [$id]);
+            $categoria = Categoria::obtenerPorId($id);
             
-            if (empty($categorias)) {
+            if (!$categoria) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Categoría no encontrada'
@@ -165,16 +166,14 @@ class CategoriaController extends Controller
             }
 
             // Verificar si hay productos asociados
-            $productos = DB::select('SELECT COUNT(*) as total FROM producto WHERE categoria_id = ?', [$id]);
-            
-            if ($productos[0]->total > 0) {
+            if (Categoria::tieneProductosAsociados($id)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'No se puede eliminar la categoría porque tiene productos asociados'
                 ], 400);
             }
 
-            DB::delete('DELETE FROM categoria WHERE id = ?', [$id]);
+            Categoria::eliminarPorId($id);
 
             return response()->json([
                 'success' => true,

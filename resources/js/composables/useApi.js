@@ -23,7 +23,35 @@ export function useApi() {
 
     const apiFetch = async (path, options = {}) => {
         const url = getApiUrl(path);
-        return fetch(url, options);
+        
+        const token = localStorage.getItem('token');
+        
+        const defaultHeaders = {};
+        if (token) {
+            defaultHeaders['Authorization'] = `Bearer ${token}`;
+        }
+        
+        if (options.body && !options.headers?.['Content-Type']) {
+            defaultHeaders['Content-Type'] = 'application/json';
+        }
+        
+        const mergedOptions = {
+            ...options,
+            headers: {
+                ...defaultHeaders,
+                ...(options.headers || {})
+            }
+        };
+        
+        const response = await fetch(url, mergedOptions);
+        
+        if (response.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = getAppUrl('/login');
+        }
+        
+        return response;
     };
 
     return {

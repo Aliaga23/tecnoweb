@@ -55,7 +55,7 @@
     <!-- Navbar -->
     <nav class="navbar">
       <div class="container navbar-content">
-        <a :href="getAppUrl('/')" class="navbar-logo">MOTO<span>PARTS</span></a>
+        <a :href="getAppUrl('/')" class="navbar-logo">ELYTA</a>
         
         <ul class="navbar-menu">
           <li><a :href="getAppUrl('/')" class="navbar-link">Inicio</a></li>
@@ -74,6 +74,8 @@
               <div v-if="userMenuOpen" class="user-menu">
                 <a :href="getAppUrl('/perfil')" class="user-menu-item">Mi perfil</a>
                 <a :href="getAppUrl('/mis-cotizaciones')" class="user-menu-item">Mis cotizaciones</a>
+                <a :href="getAppUrl('/mis-compras')" class="user-menu-item">Mis compras</a>
+                <a :href="getAppUrl('/mis-devoluciones')" class="user-menu-item">Mis devoluciones</a>
                 <button @click="cerrarSesion" class="user-menu-item">Cerrar sesión</button>
               </div>
             </div>
@@ -196,14 +198,14 @@
     <!-- Footer -->
     <footer class="footer">
       <div class="container">
-        <h3 class="footer-title">MOTO<span class="highlight">PARTS</span></h3>
+        <h3 class="footer-title">ELYTA</h3>
         <p class="footer-text">Tu mejor opción en repuestos para motos</p>
         <div class="footer-social">
           <a href="#">Facebook</a>
           <a href="#">Instagram</a>
           <a href="#">WhatsApp</a>
         </div>
-        <p style="color: #6b7280; font-size: 14px;">&copy; 2025 MotoParts. Todos los derechos reservados.</p>
+        <p style="color: #6b7280; font-size: 14px;">&copy; 2025 ELYTA. Todos los derechos reservados.</p>
         
         <div class="footer-counter">
           Visitas en esta página: <strong>{{ contadorVisitas }}</strong>
@@ -277,6 +279,9 @@ const generarQR = async () => {
       sum + (item.cantidad * item.costo_unitario), 0
     );
 
+    // Obtener cotizacion_id si existe
+    const cotizacionId = localStorage.getItem('cotizacion_id');
+
     const payload = {
       cliente_id: usuario.value.id,
       productos: carritoActual,
@@ -284,15 +289,12 @@ const generarQR = async () => {
       cliente_nombre: `${usuario.value.nombre} ${usuario.value.apellido}`,
       cliente_ci: usuario.value.ci,
       cliente_telefono: usuario.value.telefono,
-      cliente_email: usuario.value.correo
+      cliente_email: usuario.value.correo,
+      cotizacion_id: cotizacionId ? parseInt(cotizacionId) : null
     };
 
     const response = await apiFetch('/api/generar-qr', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify(payload)
     });
 
@@ -302,8 +304,9 @@ const generarQR = async () => {
       pagoInfo.value = data;
       estadoPago.value = 'pendiente';
       
-      // Limpiar carrito después de generar QR
+      // Limpiar carrito y cotizacion_id después de generar QR
       localStorage.removeItem('carrito');
+      localStorage.removeItem('cotizacion_id');
       
       // Iniciar verificación automática cada 5 segundos
       intervalVerificacion.value = setInterval(verificarEstado, 5000);
@@ -356,8 +359,7 @@ const reintentar = () => {
 const registrarVisita = async () => {
   try {
     const response = await apiFetch('/api/visitas/pago-qr', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      method: 'POST'
     });
     const data = await response.json();
     if (data.success) {

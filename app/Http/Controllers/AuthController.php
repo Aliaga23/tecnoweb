@@ -3,35 +3,29 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Tymon\JWTAuth\Facades\JWTAuth;
+use App\Models\Rol;
+use App\Models\Usuario;
 
 class AuthController extends Controller
 {
-    /**
-     * Registro de nuevo usuario
-     */
     public function register(Request $request)
     {
-        // Validación
         $validator = Validator::make($request->all(), [
             'nombre' => 'required|string|max:255',
             'apellido' => 'required|string|max:255',
-            'ci' => 'required|string|max:50|unique:usuario,ci',
+            'ci' => 'required|string|max:50',
             'telefono' => 'required|string|max:50',
-            'correo' => 'required|string|email|max:255|unique:usuario,correo',
+            'correo' => 'required|string|email|max:255',
             'password' => 'required|string|min:6'
         ], [
             'nombre.required' => 'El nombre es obligatorio',
             'apellido.required' => 'El apellido es obligatorio',
             'ci.required' => 'El CI es obligatorio',
-            'ci.unique' => 'El CI ya está registrado',
             'telefono.required' => 'El teléfono es obligatorio',
             'correo.required' => 'El correo es obligatorio',
             'correo.email' => 'El correo debe ser válido',
-            'correo.unique' => 'El correo ya está registrado',
             'password.required' => 'La contraseña es obligatoria',
             'password.min' => 'La contraseña debe tener al menos 6 caracteres'
         ]);
@@ -43,35 +37,23 @@ class AuthController extends Controller
             ], 422);
         }
 
-        try {
-            $passwordHash = Hash::make($request->password);
-            
-            // Insertar usuario con SQL crudo
-            DB::insert(
-                'INSERT INTO usuario (nombre, apellido, ci, telefono, correo, password, rol_id) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [
-                    $request->nombre,
-                    $request->apellido,
-                    $request->ci,
-                    $request->telefono,
-                    $request->correo,
-                    $passwordHash,
-                    3
-                ]
-            );
+        if (Usuario::existeCi($request->ci)) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['ci' => ['El CI ya está registrado']]
+            ], 422);
+        }
 
-            // Obtener el usuario recién creado
-            $usuario = DB::select(
-                'SELECT * FROM usuario WHERE correo = ? LIMIT 1',
-                [$request->correo]
-            )[0];
-            
-            // Obtener el rol
-            $rol = DB::select(
-                'SELECT * FROM rol WHERE id = ? LIMIT 1',
-                [$usuario->rol_id]
-            )[0] ?? null;
+        if (Usuario::existeCorreo($request->correo)) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['correo' => ['El correo ya está registrado']]
+            ], 422);
+        }
+
+        try {
+            $usuario = Usuario::crearUsuarioRegistro($request->all());
+            $rol = Rol::obtenerPorId($usuario->rol_id);
 
             return response()->json([
                 'success' => true,
@@ -96,12 +78,8 @@ class AuthController extends Controller
         }
     }
 
-    /**
-     * Login de usuario
-     */
     public function login(Request $request)
     {
-        // Validación
         $validator = Validator::make($request->all(), [
             'correo' => 'required|email',
             'password' => 'required|string'
@@ -119,41 +97,25 @@ class AuthController extends Controller
         }
 
         try {
-            // Buscar usuario por correo con SQL crudo
-            $usuarios = DB::select(
-                'SELECT * FROM usuario WHERE correo = ? LIMIT 1',
-                [$request->correo]
-            );
+            $usuario = Usuario::obtenerPorCorreo($request->correo);
 
-            if (empty($usuarios)) {
+            if (!$usuario) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Credenciales incorrectas'
                 ], 401);
             }
 
-            $usuario = $usuarios[0];
-
-            // Verificar contraseña
-            if (!Hash::check($request->password, $usuario->password)) {
+            if (!Usuario::verificarPassword($request->password, $usuario->password)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Credenciales incorrectas'
                 ], 401);
             }
 
-            // Crear instancia del modelo Usuario para JWT
-            $usuarioModel = \App\Models\Usuario::find($usuario->id);
-            
-            // Generar token JWT
+            $usuarioModel = Usuario::find($usuario->id);
             $token = JWTAuth::fromUser($usuarioModel);
-
-            // Obtener el rol con SQL crudo
-            $roles = DB::select(
-                'SELECT * FROM rol WHERE id = ? LIMIT 1',
-                [$usuario->rol_id]
-            );
-            $rol = $roles[0] ?? null;
+            $rol = Rol::obtenerPorId($usuario->rol_id);
 
             return response()->json([
                 'success' => true,
@@ -183,9 +145,6 @@ class AuthController extends Controller
         }
     }
 
-    /**
-     * Logout de usuario
-     */
     public function logout()
     {
         try {
@@ -205,9 +164,6 @@ class AuthController extends Controller
         }
     }
 
-    /**
-     * Obtener usuario autenticado
-     */
     public function me()
     {
         try {
@@ -220,18 +176,8 @@ class AuthController extends Controller
                 ], 404);
             }
 
-            // Obtener datos completos con SQL crudo
-            $usuarios = DB::select(
-                'SELECT * FROM usuario WHERE id = ? LIMIT 1',
-                [$usuario->id]
-            );
-            $usuarioData = $usuarios[0];
-
-            $roles = DB::select(
-                'SELECT * FROM rol WHERE id = ? LIMIT 1',
-                [$usuarioData->rol_id]
-            );
-            $rol = $roles[0] ?? null;
+            $usuarioData = Usuario::obtenerPorId($usuario->id);
+            $rol = Rol::obtenerPorId($usuarioData->rol_id);
 
             return response()->json([
                 'success' => true,
@@ -255,9 +201,6 @@ class AuthController extends Controller
         }
     }
 
-    /**
-     * Refrescar token
-     */
     public function refresh()
     {
         try {

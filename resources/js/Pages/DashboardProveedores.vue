@@ -20,14 +20,7 @@
 
       <div class="control-group">
         <label>Tamaño de fuente: {{ fontSizeLabel }}</label>
-        <input 
-          type="range" 
-          v-model.number="fontSize" 
-          min="12" 
-          max="24" 
-          step="2"
-          style="width: 100%;"
-        >
+        <input type="range" v-model.number="fontSize" min="12" max="24" step="2" style="width: 100%;">
       </div>
 
       <div class="control-group">
@@ -109,32 +102,79 @@
       </div>
     </nav>
 
-    <!-- Dashboard Content -->
+    <!-- Content -->
     <section class="section" style="background-color: var(--color-bg);">
       <div style="padding: 0 2rem;">
-        <h1 class="section-title">Panel de Administración</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+          <h1 class="section-title" style="margin-bottom: 0;">Gestión de Proveedores</h1>
+          <button @click="abrirModalCrear" class="btn btn-primary">Nuevo Proveedor</button>
+        </div>
 
-        <!-- Estadísticas -->
-        <div class="grid grid-cols-4" style="margin-bottom: 3rem;">
-          <div class="card" style="text-align: center; padding: 2rem;">
-            <h3 style="font-size: 2.5rem; color: var(--color-primary); margin-bottom: 0.5rem;">{{ stats.productos }}</h3>
-            <p style="color: var(--color-text-light); font-weight: 600;">Productos</p>
-          </div>
-          <div class="card" style="text-align: center; padding: 2rem;">
-            <h3 style="font-size: 2.5rem; color: var(--color-primary); margin-bottom: 0.5rem;">{{ stats.categorias }}</h3>
-            <p style="color: var(--color-text-light); font-weight: 600;">Categorías</p>
-          </div>
-          <div class="card" style="text-align: center; padding: 2rem;">
-            <h3 style="font-size: 2.5rem; color: var(--color-primary); margin-bottom: 0.5rem;">{{ stats.usuarios }}</h3>
-            <p style="color: var(--color-text-light); font-weight: 600;">Usuarios</p>
-          </div>
-          <div class="card" style="text-align: center; padding: 2rem;">
-            <h3 style="font-size: 2.5rem; color: var(--color-primary); margin-bottom: 0.5rem;">{{ stats.ventas }}</h3>
-            <p style="color: var(--color-text-light); font-weight: 600;">Ventas</p>
-          </div>
+        <!-- Tabla -->
+        <div class="card" style="padding: 0; overflow: hidden;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead style="background-color: var(--color-bg-alt);">
+              <tr>
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--color-text);">Nombre</th>
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--color-text);">Teléfono</th>
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--color-text);">Correo</th>
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--color-text);">Dirección</th>
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--color-text);">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="proveedor in proveedores" :key="proveedor.id" style="border-top: 1px solid var(--color-border);">
+                <td style="padding: 1rem; color: var(--color-text);">{{ proveedor.nombre }}</td>
+                <td style="padding: 1rem; color: var(--color-text-light);">{{ proveedor.telefono }}</td>
+                <td style="padding: 1rem; color: var(--color-text-light);">{{ proveedor.correo }}</td>
+                <td style="padding: 1rem; color: var(--color-text-light);">{{ proveedor.direccion }}</td>
+                <td style="padding: 1rem;">
+                  <button @click="abrirModalEditar(proveedor)" style="color: var(--color-primary); background: none; border: none; cursor: pointer; margin-right: 1rem;">Editar</button>
+                  <button @click="eliminar(proveedor.id)" style="color: var(--color-primary); background: none; border: none; cursor: pointer;">Eliminar</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
+
+    <!-- Modal Crear/Editar -->
+    <div v-if="modalAbierto" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;">
+      <div class="card" style="width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto;">
+        <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--color-text); margin-bottom: 1.5rem;">
+          {{ editando ? 'Editar Proveedor' : 'Nuevo Proveedor' }}
+        </h2>
+
+        <form @submit.prevent="guardar">
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label>Nombre</label>
+            <input v-model="form.nombre" type="text" required class="form-input">
+          </div>
+
+          <div class="grid grid-cols-2" style="gap: 1rem; margin-bottom: 1rem;">
+            <div class="form-group">
+              <label>Teléfono</label>
+              <input v-model="form.telefono" type="text" required class="form-input">
+            </div>
+            <div class="form-group">
+              <label>Correo</label>
+              <input v-model="form.correo" type="email" required class="form-input">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label>Dirección</label>
+            <input v-model="form.direccion" type="text" class="form-input">
+          </div>
+
+          <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+            <button type="button" @click="cerrarModal" class="btn btn-secondary">Cancelar</button>
+            <button type="submit" class="btn btn-primary">{{ editando ? 'Actualizar' : 'Crear' }}</button>
+          </div>
+        </form>
+      </div>
+    </div>
 
     <!-- Footer -->
     <footer class="footer">
@@ -162,7 +202,7 @@ import { User } from 'lucide-vue-next';
 import { useApi } from '../composables/useApi';
 const { apiFetch, getAppUrl } = useApi();
 
-// Accesibilidad
+// Accesibilidad (mismo código que Dashboard)
 const accessibilityPanelOpen = ref(false);
 const currentTheme = ref(localStorage.getItem('theme') || 'theme-adults');
 const fontSize = ref(parseInt(localStorage.getItem('fontSize')) || 16);
@@ -185,9 +225,7 @@ const fontSizeClass = computed(() => {
 });
 
 const isNightMode = computed(() => {
-  if (!autoNightMode.value) {
-    return manualNightMode.value;
-  }
+  if (!autoNightMode.value) return manualNightMode.value;
   const hora = new Date().getHours();
   return hora >= 19 || hora < 7;
 });
@@ -207,9 +245,9 @@ const toggleAccessibilityPanel = () => {
 
 watch(currentTheme, (val) => localStorage.setItem('theme', val));
 watch(fontSize, (val) => localStorage.setItem('fontSize', val.toString()));
-watch(highContrast, (val) => localStorage.setItem('highContrast', val));
-watch(manualNightMode, (val) => localStorage.setItem('manualNightMode', val));
-watch(autoNightMode, (val) => localStorage.setItem('autoNightMode', val));
+watch(highContrast, (val) => localStorage.setItem('highContrast', val.toString()));
+watch(manualNightMode, (val) => localStorage.setItem('manualNightMode', val.toString()));
+watch(autoNightMode, (val) => localStorage.setItem('autoNightMode', val.toString()));
 
 // Contador de visitas
 const contadorVisitas = ref(0);
@@ -218,17 +256,14 @@ const contadorVisitas = ref(0);
 const usuario = ref(null);
 const userMenuOpen = ref(false);
 
-const usuarioData = localStorage.getItem('user');
-if (usuarioData) {
-  try {
+onMounted(() => {
+  const usuarioData = localStorage.getItem('user');
+  if (usuarioData) {
     usuario.value = JSON.parse(usuarioData);
-  } catch (error) {
-    console.error('Error al parsear usuario:', error);
+  } else {
     window.location.href = getAppUrl('/login');
   }
-} else {
-  window.location.href = getAppUrl('/login');
-}
+});
 
 const toggleUserMenu = () => {
   userMenuOpen.value = !userMenuOpen.value;
@@ -247,42 +282,109 @@ const toggleDropdown = (menu) => {
   dropdownOpen.value = dropdownOpen.value === menu ? null : menu;
 };
 
-// Estadísticas
-const stats = ref({
-  productos: 0,
-  categorias: 0,
-  usuarios: 0,
-  ventas: 0
+// Proveedores
+const proveedores = ref([]);
+const modalAbierto = ref(false);
+const editando = ref(false);
+const form = ref({
+  id: null,
+  nombre: '',
+  telefono: '',
+  correo: '',
+  direccion: ''
 });
 
-const cargarEstadisticas = async () => {
+const cargarProveedores = async () => {
   const token = localStorage.getItem('token');
-  
   try {
-    // Cargar productos
-    const productosRes = await apiFetch('/api/productos');
-    const productosData = await productosRes.json();
-    stats.value.productos = productosData.data?.length || 0;
-
-    // Cargar categorías
-    const categoriasRes = await apiFetch('/api/categorias');
-    const categoriasData = await categoriasRes.json();
-    stats.value.categorias = categoriasData.data?.length || 0;
-
-    // Cargar usuarios
-    const usuariosRes = await apiFetch('/api/usuarios');
-    const usuariosData = await usuariosRes.json();
-    stats.value.usuarios = usuariosData.data?.length || 0;
-
-    stats.value.ventas = 0; // Placeholder hasta implementar ventas
+    const response = await apiFetch('/api/proveedores');
+    
+    if (response.ok) {
+      const result = await response.json();
+      proveedores.value = result.data || result;
+    }
   } catch (error) {
-    console.error('Error al cargar estadísticas:', error);
+    console.error('Error al cargar proveedores:', error);
+  }
+};
+
+const abrirModalCrear = () => {
+  editando.value = false;
+  form.value = {
+    id: null,
+    nombre: '',
+    telefono: '',
+    correo: '',
+    direccion: ''
+  };
+  modalAbierto.value = true;
+};
+
+const abrirModalEditar = (proveedor) => {
+  editando.value = true;
+  form.value = { ...proveedor };
+  modalAbierto.value = true;
+};
+
+const cerrarModal = () => {
+  modalAbierto.value = false;
+  form.value = {
+    id: null,
+    nombre: '',
+    telefono: '',
+    correo: '',
+    direccion: ''
+  };
+};
+
+const guardar = async () => {
+  const token = localStorage.getItem('token');
+  const url = editando.value ? `/api/proveedores/${form.value.id}` : '/api/proveedores';
+  const method = editando.value ? 'PUT' : 'POST';
+
+  try {
+    const response = await apiFetch(url, {
+      method,
+      body: JSON.stringify(form.value)
+    });
+
+    if (response.ok) {
+      alert(editando.value ? 'Proveedor actualizado' : 'Proveedor creado');
+      cerrarModal();
+      cargarProveedores();
+    } else {
+      alert('Error al guardar proveedor');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Error al guardar proveedor');
+  }
+};
+
+const eliminar = async (id) => {
+  if (!confirm('¿Estás seguro de eliminar este proveedor?')) return;
+
+  const token = localStorage.getItem('token');
+  try {
+    const response = await apiFetch(`/api/proveedores/${id}`, {
+      method: 'DELETE'
+    });
+
+    if (response.ok) {
+      alert('Proveedor eliminado');
+      cargarProveedores();
+    } else {
+      alert('Error al eliminar proveedor');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Error al eliminar proveedor');
   }
 };
 
 const registrarVisita = async () => {
   try {
-    const response = await apiFetch('/api/visitas/dashboard', {
+    const response = await apiFetch('/api/visitas/dashboard-proveedores', {
       method: 'POST'
     });
     const data = await response.json();
@@ -296,28 +398,27 @@ const registrarVisita = async () => {
 
 onMounted(async () => {
   // Verificar rol del usuario
-  const userData = localStorage.getItem('user');
-  if (userData) {
+  const usuarioData = localStorage.getItem('user');
+  if (usuarioData) {
     try {
-      const user = JSON.parse(userData);
-      // Si no es Propietario o Vendedor, redirigir a landing
+      const user = JSON.parse(usuarioData);
       if (user.rol !== 'Propietario' && user.rol !== 'Vendedor') {
         window.location.href = getAppUrl('/');
         return;
       }
+      usuario.value = user;
     } catch (error) {
       console.error('Error al verificar usuario:', error);
       window.location.href = getAppUrl('/');
       return;
     }
   } else {
-    // Si no hay usuario logueado, redirigir a login
     window.location.href = getAppUrl('/login');
     return;
   }
   
   await registrarVisita();
-  cargarEstadisticas();
+  cargarProveedores();
 });
 </script>
 
@@ -332,18 +433,27 @@ onMounted(async () => {
   flex: 1;
 }
 
-.card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--color-text);
 }
 
-table th,
-table td {
-  border-bottom: 1px solid var(--color-border);
+.form-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid var(--color-border);
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  box-sizing: border-box;
 }
 
-table tbody tr:last-child td {
-  border-bottom: none;
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
 }
 
 .navbar-dropdown {

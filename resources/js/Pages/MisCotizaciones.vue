@@ -55,7 +55,7 @@
     <!-- Navbar -->
     <nav class="navbar">
       <div class="container navbar-content">
-        <a :href="getAppUrl('/')" class="navbar-logo">MOTO<span>PARTS</span></a>
+        <a :href="getAppUrl('/')" class="navbar-logo">ELYTA</a>
         
         <ul class="navbar-menu">
           <li><a :href="getAppUrl('/')" class="navbar-link">Inicio</a></li>
@@ -74,6 +74,8 @@
               <div v-if="userMenuOpen" class="user-menu">
                 <a :href="getAppUrl('/perfil')" class="user-menu-item">Mi perfil</a>
                 <a :href="getAppUrl('/mis-cotizaciones')" class="user-menu-item">Mis cotizaciones</a>
+                <a :href="getAppUrl('/mis-compras')" class="user-menu-item">Mis compras</a>
+                <a :href="getAppUrl('/mis-devoluciones')" class="user-menu-item">Mis devoluciones</a>
                 <button @click="cerrarSesion" class="user-menu-item">Cerrar sesión</button>
               </div>
             </div>
@@ -136,8 +138,9 @@
               <button @click="descargarPDF(cotizacion.id)" class="btn btn-secondary" style="flex: 1;">
                 Descargar PDF
               </button>
-              <button @click="duplicarCotizacion(cotizacion)" class="btn btn-secondary" style="padding: 0.75rem; display: flex; align-items: center; justify-content: center;" title="Duplicar cotización">
-                <Copy :size="20" />
+              <button @click="comprarCotizacion(cotizacion)" class="btn btn-primary" style="padding: 0.75rem 1.5rem; display: flex; align-items: center; gap: 0.5rem; background: #16a34a;" title="Comprar cotización">
+                <ShoppingCart :size="20" />
+                Comprar
               </button>
             </div>
           </div>
@@ -153,14 +156,14 @@
     <!-- Footer -->
     <footer class="footer">
       <div class="container">
-        <h3 class="footer-title">MOTO<span class="highlight">PARTS</span></h3>
+        <h3 class="footer-title">ELYTA</h3>
         <p class="footer-text">Tu mejor opción en repuestos para motos</p>
         <div class="footer-social">
           <a href="#">Facebook</a>
           <a href="#">Instagram</a>
           <a href="#">WhatsApp</a>
         </div>
-        <p style="color: #6b7280; font-size: 14px;">&copy; 2025 MotoParts. Todos los derechos reservados.</p>
+        <p style="color: #6b7280; font-size: 14px;">&copy; 2025 ELYTA. Todos los derechos reservados.</p>
         
         <div class="footer-counter">
           Visitas en esta página: <strong>{{ contadorVisitas }}</strong>
@@ -237,12 +240,7 @@ const cargarCotizaciones = async () => {
       return;
     }
 
-    const response = await apiFetch(`/api/cotizaciones/usuario/${usuario.value.id}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    const response = await apiFetch(`/api/cotizaciones/usuario/${usuario.value.id}`);
 
     const data = await response.json();
     if (response.ok) {
@@ -270,10 +268,7 @@ const descargarPDF = async (cotizacionId) => {
     }
 
     const response = await apiFetch(`/api/cotizaciones/${cotizacionId}/pdf`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      }
+      method: 'GET'
     });
 
     if (response.ok) {
@@ -308,12 +303,70 @@ const duplicarCotizacion = async (cotizacion) => {
   }
 };
 
+const comprarCotizacion = async (cotizacion) => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('Debe iniciar sesión para realizar la compra');
+      window.location.href = getAppUrl('/login');
+      return;
+    }
+
+    // Obtener los detalles de la cotización
+    const detailsResponse = await apiFetch(`/api/cotizaciones/${cotizacion.id}`);
+    if (!detailsResponse.ok) {
+      throw new Error('Error al obtener detalles de la cotización');
+    }
+    
+    const cotizacionDetalle = await detailsResponse.json();
+    
+    // Obtener el stock actual de cada producto
+    const carritoItems = await Promise.all(
+      cotizacionDetalle.detalles.map(async (detalle) => {
+        try {
+          const productoResponse = await apiFetch(`/api/productos/${detalle.producto_id}`);
+          const productoData = await productoResponse.json();
+          
+          return {
+            producto_id: detalle.producto_id,
+            nombre: detalle.producto || 'Producto',
+            costo_unitario: parseFloat(detalle.costo_unitario),
+            cantidad: detalle.cantidad,
+            stock_maximo: productoData.data?.stock_actual || detalle.cantidad,
+            imagen_url: productoData.data?.imagen_url || null
+          };
+        } catch (error) {
+          console.error('Error al obtener producto:', error);
+          return {
+            producto_id: detalle.producto_id,
+            nombre: detalle.producto || 'Producto',
+            costo_unitario: parseFloat(detalle.costo_unitario),
+            cantidad: detalle.cantidad,
+            stock_maximo: detalle.cantidad,
+            imagen_url: null
+          };
+        }
+      })
+    );
+
+    // Guardar en localStorage
+    localStorage.setItem('carrito', JSON.stringify(carritoItems));
+    localStorage.setItem('cotizacion_id', cotizacion.id);
+
+    // Redirigir a la página de pago
+    window.location.href = getAppUrl('/pago-qr');
+    
+  } catch (error) {
+    console.error('Error al comprar cotización:', error);
+    alert('Error al procesar la compra: ' + error.message);
+  }
+};
+
 // Registrar visita
 const registrarVisita = async () => {
   try {
     const response = await apiFetch('/api/visitas/mis-cotizaciones', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      method: 'POST'
     });
     const data = await response.json();
     if (data.success) {

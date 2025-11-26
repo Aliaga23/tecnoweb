@@ -10,6 +10,10 @@ use App\Http\Controllers\CatalogoController;
 use App\Http\Controllers\ProveedorController;
 use App\Http\Controllers\CotizacionController;
 use App\Http\Controllers\PagoController;
+use App\Http\Controllers\CompraController;
+use App\Http\Controllers\DevolucionController;
+use App\Http\Controllers\DevolucionProveedorController;
+use App\Http\Controllers\TransaccionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -98,6 +102,42 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/proveedores', [ProveedorController::class, 'store']);
         Route::put('/proveedores/{id}', [ProveedorController::class, 'update']);
         Route::delete('/proveedores/{id}', [ProveedorController::class, 'destroy']);
+        
+        // Gestión de Pagos (solo lectura para Propietario y Vendedor)
+        Route::get('/pagos', [PagoController::class, 'index']);
+        Route::get('/pagos/{id}', [PagoController::class, 'show']);
+        
+        // Ventas al Crédito (Propietario y Vendedor)
+        Route::get('/clientes/buscar/{ci}', [TransaccionController::class, 'buscarClientePorCi']);
+        Route::post('/ventas/credito', [TransaccionController::class, 'crearVentaCredito']);
+        Route::get('/ventas/credito', [TransaccionController::class, 'obtenerVentasCredito']);
+        Route::post('/ventas/{id}/pagos', [TransaccionController::class, 'registrarPagoCredito']);
+        
+        // Gestión de Ventas (solo lectura para Propietario y Vendedor)
+        Route::get('/ventas', [CompraController::class, 'indexVentas']);
+        Route::get('/ventas/{id}', [CompraController::class, 'showVenta']);
+        
+        // Gestión de Transacciones (unificado)
+        Route::get('/transacciones', [TransaccionController::class, 'index']);
+        Route::get('/transacciones/venta/{id}', [TransaccionController::class, 'detalleVenta']);
+        Route::get('/transacciones/resumen', [TransaccionController::class, 'resumen']);
+        
+        // Dashboard administrativo - Devoluciones unificadas
+        Route::get('/devoluciones', [DevolucionController::class, 'obtenerTodasDevoluciones']);
+        Route::get('/devoluciones/{id}/detalle', [DevolucionController::class, 'obtenerDetalleDevolucion']);
+        Route::get('/ventas/ci/{ci}', [DevolucionController::class, 'buscarVentasPorCarnet']);
+        Route::get('/ventas/{id}/detalle', [DevolucionController::class, 'obtenerDetalleVenta']);
+        Route::post('/devoluciones', [DevolucionController::class, 'crearDevolucion']);
+        
+        // Dashboard administrativo - Devoluciones a Proveedores
+        Route::get('/devoluciones-proveedor', [DevolucionProveedorController::class, 'obtenerDevoluciones']);
+        Route::get('/devoluciones-proveedor/{id}/detalle', [DevolucionProveedorController::class, 'obtenerDetalle']);
+        Route::get('/proveedores', [DevolucionProveedorController::class, 'obtenerProveedores']);
+        Route::get('/productos-disponibles', [DevolucionProveedorController::class, 'obtenerProductos']);
+        Route::post('/devoluciones-proveedor', [DevolucionProveedorController::class, 'crearDevolucion']);
+        
+        // Dashboard administrativo - Gestión de Cotizaciones
+        Route::get('/cotizaciones/{id}/detalle', [CotizacionController::class, 'obtenerDetalle']);
     });
     
     // Ver productos y categorías (todos los roles autenticados)
@@ -114,4 +154,17 @@ Route::middleware('auth:api')->group(function () {
     Route::delete('/cotizaciones/{id}', [CotizacionController::class, 'destroy']);
     Route::get('/cotizaciones/usuario/{usuario_id}', [CotizacionController::class, 'porUsuario']);
     Route::get('/cotizaciones/{id}/pdf', [CotizacionController::class, 'generarPDF']);
+    
+    // Compras del usuario
+    Route::get('/mis-compras', [CompraController::class, 'obtenerCompras']);
+    Route::get('/compras/{id}', [CompraController::class, 'obtenerDetalle']);
+    Route::post('/ventas', [CompraController::class, 'store']);
+    
+    // Devoluciones del usuario
+    Route::get('/mis-devoluciones', [DevolucionController::class, 'obtenerDevoluciones']);
+    Route::get('/devoluciones/{id}', [DevolucionController::class, 'obtenerDetalle']);
+    
+    // Ventas al Crédito del Cliente
+    Route::get('/mis-ventas-credito', [TransaccionController::class, 'misVentasCredito']);
+    Route::post('/ventas/{id}/pago-credito', [TransaccionController::class, 'registrarPagoCredito']);
 });

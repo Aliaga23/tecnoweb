@@ -3,45 +3,20 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use App\Models\Rol;
+use App\Models\Usuario;
 
 class UsuarioController extends Controller
 {
-    /**
-     * Listar todos los usuarios
-     */
     public function index()
     {
         try {
-            $usuarios = DB::select(
-                'SELECT u.*, r.nombre as rol_nombre, r.id as rol_id
-                 FROM usuario u 
-                 LEFT JOIN rol r ON u.rol_id = r.id 
-                 ORDER BY u.id'
-            );
-
-            // Formatear datos
-            $usuariosFormatted = array_map(function($u) {
-                return [
-                    'id' => $u->id,
-                    'nombre' => $u->nombre,
-                    'apellido' => $u->apellido,
-                    'ci' => $u->ci,
-                    'telefono' => $u->telefono,
-                    'correo' => $u->correo,
-                    'rol_id' => $u->rol_id,
-                    'rol' => [
-                        'id' => $u->rol_id,
-                        'nombre' => $u->rol_nombre
-                    ]
-                ];
-            }, $usuarios);
+            $usuarios = Usuario::obtenerTodosConRol();
 
             return response()->json([
                 'success' => true,
-                'data' => $usuariosFormatted
+                'data' => $usuarios
             ], 200);
 
         } catch (\Exception $e) {
@@ -53,22 +28,12 @@ class UsuarioController extends Controller
         }
     }
 
-    /**
-     * Obtener un usuario por ID
-     */
     public function show($id)
     {
         try {
-            $usuarios = DB::select(
-                'SELECT u.*, r.nombre as rol_nombre 
-                 FROM usuario u 
-                 LEFT JOIN rol r ON u.rol_id = r.id 
-                 WHERE u.id = ? 
-                 LIMIT 1',
-                [$id]
-            );
+            $usuario = Usuario::obtenerPorIdConRol($id);
 
-            if (empty($usuarios)) {
+            if (!$usuario) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Usuario no encontrado'
@@ -77,7 +42,7 @@ class UsuarioController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $usuarios[0]
+                'data' => $usuario
             ], 200);
 
         } catch (\Exception $e) {
@@ -89,32 +54,47 @@ class UsuarioController extends Controller
         }
     }
 
-    /**
-     * Crear nuevo usuario
-     */
     public function store(Request $request)
     {
+        if (Usuario::existeCi($request->ci)) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['ci' => ['El CI ya está registrado']]
+            ], 422);
+        }
+
+        if (Usuario::existeCorreo($request->correo)) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['correo' => ['El correo ya está registrado']]
+            ], 422);
+        }
+
+        if (!Rol::existe($request->rol_id)) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['rol_id' => ['El rol seleccionado no existe']]
+            ], 422);
+        }
+
         $validator = Validator::make($request->all(), [
             'nombre' => 'required|string|max:255',
             'apellido' => 'required|string|max:255',
-            'ci' => 'required|string|max:50|unique:usuario,ci',
+            'ci' => 'required|string|max:50',
             'telefono' => 'required|string|max:50',
-            'correo' => 'required|string|email|max:255|unique:usuario,correo',
+            'correo' => 'required|string|email|max:255',
             'password' => 'required|string|min:6',
-            'rol_id' => 'required|integer|exists:rol,id'
+            'rol_id' => 'required|integer'
         ], [
             'nombre.required' => 'El nombre es obligatorio',
             'apellido.required' => 'El apellido es obligatorio',
             'ci.required' => 'El CI es obligatorio',
-            'ci.unique' => 'El CI ya está registrado',
             'telefono.required' => 'El teléfono es obligatorio',
             'correo.required' => 'El correo es obligatorio',
             'correo.email' => 'El correo debe ser válido',
-            'correo.unique' => 'El correo ya está registrado',
             'password.required' => 'La contraseña es obligatoria',
             'password.min' => 'La contraseña debe tener al menos 6 caracteres',
-            'rol_id.required' => 'El rol es obligatorio',
-            'rol_id.exists' => 'El rol seleccionado no existe'
+            'rol_id.required' => 'El rol es obligatorio'
         ]);
 
         if ($validator->fails()) {
@@ -125,30 +105,7 @@ class UsuarioController extends Controller
         }
 
         try {
-            $passwordHash = Hash::make($request->password);
-            
-            DB::insert(
-                'INSERT INTO usuario (nombre, apellido, ci, telefono, correo, password, rol_id) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [
-                    $request->nombre,
-                    $request->apellido,
-                    $request->ci,
-                    $request->telefono,
-                    $request->correo,
-                    $passwordHash,
-                    $request->rol_id
-                ]
-            );
-
-            $usuario = DB::select(
-                'SELECT u.*, r.nombre as rol_nombre 
-                 FROM usuario u 
-                 LEFT JOIN rol r ON u.rol_id = r.id 
-                 WHERE u.correo = ? 
-                 LIMIT 1',
-                [$request->correo]
-            )[0];
+            $usuario = Usuario::crearNuevo($request->all());
 
             return response()->json([
                 'success' => true,
@@ -165,41 +122,55 @@ class UsuarioController extends Controller
         }
     }
 
-    /**
-     * Actualizar usuario
-     */
     public function update(Request $request, $id)
     {
-        // Verificar si el usuario existe
-        $usuarios = DB::select('SELECT * FROM usuario WHERE id = ? LIMIT 1', [$id]);
+        $usuario = Usuario::obtenerPorId($id);
         
-        if (empty($usuarios)) {
+        if (!$usuario) {
             return response()->json([
                 'success' => false,
                 'message' => 'Usuario no encontrado'
             ], 404);
         }
 
+        if ($request->filled('ci') && Usuario::existeCi($request->ci, $id)) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['ci' => ['El CI ya está registrado']]
+            ], 422);
+        }
+
+        if ($request->filled('correo') && Usuario::existeCorreo($request->correo, $id)) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['correo' => ['El correo ya está registrado']]
+            ], 422);
+        }
+
+        if ($request->filled('rol_id') && !Rol::existe($request->rol_id)) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['rol_id' => ['El rol seleccionado no existe']]
+            ], 422);
+        }
+
         $validator = Validator::make($request->all(), [
             'nombre' => 'sometimes|required|string|max:255',
             'apellido' => 'sometimes|required|string|max:255',
-            'ci' => 'sometimes|required|string|max:50|unique:usuario,ci,' . $id,
+            'ci' => 'sometimes|required|string|max:50',
             'telefono' => 'sometimes|required|string|max:50',
-            'correo' => 'sometimes|required|string|email|max:255|unique:usuario,correo,' . $id,
+            'correo' => 'sometimes|required|string|email|max:255',
             'password' => 'sometimes|nullable|string|min:6',
-            'rol_id' => 'sometimes|required|integer|exists:rol,id'
+            'rol_id' => 'sometimes|required|integer'
         ], [
             'nombre.required' => 'El nombre es obligatorio',
             'apellido.required' => 'El apellido es obligatorio',
             'ci.required' => 'El CI es obligatorio',
-            'ci.unique' => 'El CI ya está registrado',
             'telefono.required' => 'El teléfono es obligatorio',
             'correo.required' => 'El correo es obligatorio',
             'correo.email' => 'El correo debe ser válido',
-            'correo.unique' => 'El correo ya está registrado',
             'password.min' => 'La contraseña debe tener al menos 6 caracteres',
-            'rol_id.required' => 'El rol es obligatorio',
-            'rol_id.exists' => 'El rol seleccionado no existe'
+            'rol_id.required' => 'El rol es obligatorio'
         ]);
 
         if ($validator->fails()) {
@@ -210,35 +181,7 @@ class UsuarioController extends Controller
         }
 
         try {
-            $usuarioActual = $usuarios[0];
-            
-            $nombre = $request->input('nombre', $usuarioActual->nombre);
-            $apellido = $request->input('apellido', $usuarioActual->apellido);
-            $ci = $request->input('ci', $usuarioActual->ci);
-            $telefono = $request->input('telefono', $usuarioActual->telefono);
-            $correo = $request->input('correo', $usuarioActual->correo);
-            $rol_id = $request->input('rol_id', $usuarioActual->rol_id);
-            
-            // Si hay password nuevo, lo hasheamos, sino mantenemos el actual
-            $password = $request->filled('password') 
-                ? Hash::make($request->password) 
-                : $usuarioActual->password;
-
-            DB::update(
-                'UPDATE usuario 
-                 SET nombre = ?, apellido = ?, ci = ?, telefono = ?, correo = ?, password = ?, rol_id = ? 
-                 WHERE id = ?',
-                [$nombre, $apellido, $ci, $telefono, $correo, $password, $rol_id, $id]
-            );
-
-            $usuarioActualizado = DB::select(
-                'SELECT u.*, r.nombre as rol_nombre 
-                 FROM usuario u 
-                 LEFT JOIN rol r ON u.rol_id = r.id 
-                 WHERE u.id = ? 
-                 LIMIT 1',
-                [$id]
-            )[0];
+            $usuarioActualizado = Usuario::actualizarPorId($id, $request->all());
 
             return response()->json([
                 'success' => true,
@@ -255,22 +198,19 @@ class UsuarioController extends Controller
         }
     }
 
-    /**
-     * Eliminar usuario
-     */
     public function destroy($id)
     {
         try {
-            $usuarios = DB::select('SELECT * FROM usuario WHERE id = ? LIMIT 1', [$id]);
+            $usuario = Usuario::obtenerPorId($id);
             
-            if (empty($usuarios)) {
+            if (!$usuario) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Usuario no encontrado'
                 ], 404);
             }
 
-            DB::delete('DELETE FROM usuario WHERE id = ?', [$id]);
+            Usuario::eliminarPorId($id);
 
             return response()->json([
                 'success' => true,

@@ -12,65 +12,24 @@ use Dompdf\Options;
 
 class CotizacionController extends Controller
 {
-    // Listar todas las cotizaciones con sus detalles
     public function index()
     {
         try {
-            $cotizaciones = DB::select("
-                SELECT 
-                    c.id,
-                    c.fecha_cotizacion,
-                    c.total,
-                    c.cliente_id,
-                    u.nombre || ' ' || u.apellido as cliente
-                FROM cotizacion c
-                LEFT JOIN usuario u ON c.cliente_id = u.id
-                ORDER BY c.fecha_cotizacion DESC
-            ");
-
+            $cotizaciones = Cotizacion::obtenerTodas();
             return response()->json($cotizaciones, 200);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Error al obtener cotizaciones: ' . $e->getMessage()], 500);
         }
     }
 
-    // Obtener una cotización específica con sus detalles
     public function show($id)
     {
         try {
-            $cotizacion = DB::selectOne("
-                SELECT 
-                    c.id,
-                    c.fecha_cotizacion,
-                    c.total,
-                    c.cliente_id,
-                    u.nombre || ' ' || u.apellido as cliente,
-                    u.correo,
-                    u.telefono
-                FROM cotizacion c
-                LEFT JOIN usuario u ON c.cliente_id = u.id
-                WHERE c.id = ?
-            ", [$id]);
+            $cotizacion = Cotizacion::obtenerPorId($id);
 
             if (!$cotizacion) {
                 return response()->json(['error' => 'Cotización no encontrada'], 404);
             }
-
-            $detalles = DB::select("
-                SELECT 
-                    dc.id,
-                    dc.cantidad,
-                    dc.costo_unitario,
-                    dc.subtotal,
-                    dc.producto_id,
-                    p.nombre as producto,
-                    p.descripcion
-                FROM detalle_cotizacion dc
-                LEFT JOIN producto p ON dc.producto_id = p.id
-                WHERE dc.cotizacion_id = ?
-            ", [$id]);
-
-            $cotizacion->detalles = $detalles;
 
             return response()->json($cotizacion, 200);
         } catch (\Exception $e) {
@@ -78,7 +37,6 @@ class CotizacionController extends Controller
         }
     }
 
-    // Crear nueva cotización
     public function store(Request $request)
     {
         $request->validate([
@@ -90,38 +48,7 @@ class CotizacionController extends Controller
         ]);
 
         try {
-            DB::beginTransaction();
-
-            // Calcular el total
-            $total = 0;
-            foreach ($request->detalles as $detalle) {
-                $total += $detalle['cantidad'] * $detalle['costo_unitario'];
-            }
-
-            // Insertar cotización
-            $cotizacionId = DB::selectOne("
-                INSERT INTO cotizacion (fecha_cotizacion, total, cliente_id, vendedor_id)
-                VALUES (NOW(), ?, ?, 3)
-                RETURNING id
-            ", [$total, $request->cliente_id])->id;
-
-            // Insertar detalles
-            foreach ($request->detalles as $detalle) {
-                $subtotal = $detalle['cantidad'] * $detalle['costo_unitario'];
-                
-                DB::insert("
-                    INSERT INTO detalle_cotizacion (cantidad, costo_unitario, subtotal, cotizacion_id, producto_id)
-                    VALUES (?, ?, ?, ?, ?)
-                ", [
-                    $detalle['cantidad'],
-                    $detalle['costo_unitario'],
-                    $subtotal,
-                    $cotizacionId,
-                    $detalle['producto_id']
-                ]);
-            }
-
-            DB::commit();
+            $cotizacionId = Cotizacion::crearNueva($request->cliente_id, $request->detalles);
 
             return response()->json([
                 'message' => 'Cotización creada exitosamente',
@@ -129,12 +56,10 @@ class CotizacionController extends Controller
             ], 201);
 
         } catch (\Exception $e) {
-            DB::rollBack();
             return response()->json(['error' => 'Error al crear cotización: ' . $e->getMessage()], 500);
         }
     }
 
-    // Actualizar cotización
     public function update(Request $request, $id)
     {
         $request->validate([
@@ -145,143 +70,82 @@ class CotizacionController extends Controller
         ]);
 
         try {
-            DB::beginTransaction();
-
-            // Verificar que la cotización existe
-            $existe = DB::selectOne("SELECT id FROM cotizacion WHERE id = ?", [$id]);
-            if (!$existe) {
+            if (!Cotizacion::existe($id)) {
                 return response()->json(['error' => 'Cotización no encontrada'], 404);
             }
 
-            // Calcular el nuevo total
-            $total = 0;
-            foreach ($request->detalles as $detalle) {
-                $total += $detalle['cantidad'] * $detalle['costo_unitario'];
-            }
-
-            // Actualizar cotización
-            DB::update("
-                UPDATE cotizacion 
-                SET total = ?, fecha_cotizacion = NOW()
-                WHERE id = ?
-            ", [$total, $id]);
-
-            // Eliminar detalles anteriores
-            DB::delete("DELETE FROM detalle_cotizacion WHERE cotizacion_id = ?", [$id]);
-
-            // Insertar nuevos detalles
-            foreach ($request->detalles as $detalle) {
-                $subtotal = $detalle['cantidad'] * $detalle['costo_unitario'];
-                
-                DB::insert("
-                    INSERT INTO detalle_cotizacion (cantidad, costo_unitario, subtotal, cotizacion_id, producto_id)
-                    VALUES (?, ?, ?, ?, ?)
-                ", [
-                    $detalle['cantidad'],
-                    $detalle['costo_unitario'],
-                    $subtotal,
-                    $id,
-                    $detalle['producto_id']
-                ]);
-            }
-
-            DB::commit();
+            Cotizacion::actualizarPorId($id, $request->detalles);
 
             return response()->json(['message' => 'Cotización actualizada exitosamente'], 200);
 
         } catch (\Exception $e) {
-            DB::rollBack();
             return response()->json(['error' => 'Error al actualizar cotización: ' . $e->getMessage()], 500);
         }
     }
 
-    // Eliminar cotización
     public function destroy($id)
     {
         try {
-            DB::beginTransaction();
-
-            // Verificar que existe
-            $existe = DB::selectOne("SELECT id FROM cotizacion WHERE id = ?", [$id]);
-            if (!$existe) {
+            if (!Cotizacion::existe($id)) {
                 return response()->json(['error' => 'Cotización no encontrada'], 404);
             }
 
-            // Eliminar detalles primero
-            DB::delete("DELETE FROM detalle_cotizacion WHERE cotizacion_id = ?", [$id]);
-
-            // Eliminar cotización
-            DB::delete("DELETE FROM cotizacion WHERE id = ?", [$id]);
-
-            DB::commit();
+            Cotizacion::eliminarPorId($id);
 
             return response()->json(['message' => 'Cotización eliminada exitosamente'], 200);
 
         } catch (\Exception $e) {
-            DB::rollBack();
             return response()->json(['error' => 'Error al eliminar cotización: ' . $e->getMessage()], 500);
         }
     }
 
-    // Obtener cotizaciones de un usuario específico
+    public function obtenerDetalle($id)
+    {
+        try {
+            $cotizacion = Cotizacion::obtenerDetalleCompleto($id);
+            
+            if (!$cotizacion) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cotización no encontrada'
+                ], 404);
+            }
+            
+            return response()->json([
+                'success' => true,
+                'data' => $cotizacion
+            ], 200);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener detalle de cotización',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function porUsuario($usuario_id)
     {
         try {
-            $cotizaciones = DB::select("
-                SELECT 
-                    c.id,
-                    c.fecha_cotizacion,
-                    c.total,
-                    c.cliente_id
-                FROM cotizacion c
-                WHERE c.cliente_id = ?
-                ORDER BY c.fecha_cotizacion DESC
-            ", [$usuario_id]);
-
+            $cotizaciones = Cotizacion::obtenerPorUsuario($usuario_id);
             return response()->json($cotizaciones, 200);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Error al obtener cotizaciones: ' . $e->getMessage()], 500);
         }
     }
 
-    // Generar PDF de una cotización
     public function generarPDF($id)
     {
         try {
-            // Obtener la cotización con sus detalles (reutilizando lógica del método show)
-            $cotizacion = DB::selectOne("
-                SELECT 
-                    c.id,
-                    c.fecha_cotizacion,
-                    c.total,
-                    c.cliente_id,
-                    u.nombre || ' ' || u.apellido as cliente,
-                    u.correo,
-                    u.telefono,
-                    u.ci
-                FROM cotizacion c
-                LEFT JOIN usuario u ON c.cliente_id = u.id
-                WHERE c.id = ?
-            ", [$id]);
+            $datos = Cotizacion::obtenerPorIdParaPDF($id);
 
-            if (!$cotizacion) {
+            if (!$datos) {
                 return response()->json(['error' => 'Cotización no encontrada'], 404);
             }
 
-            $detalles = DB::select("
-                SELECT 
-                    dc.id,
-                    dc.cantidad,
-                    dc.costo_unitario,
-                    dc.subtotal,
-                    p.nombre,
-                    p.descripcion,
-                    p.imagen_url
-                FROM detalle_cotizacion dc
-                LEFT JOIN producto p ON dc.producto_id = p.id
-                WHERE dc.cotizacion_id = ?
-                ORDER BY dc.id
-            ", [$id]);
+            $cotizacion = $datos['cotizacion'];
+            $detalles = $datos['detalles'];
 
             // Crear el HTML para el PDF
             $html = $this->generarHtmlPDF($cotizacion, $detalles);
@@ -413,7 +277,7 @@ class CotizacionController extends Controller
         </head>
         <body>
             <div class="header">
-                <h1 class="company-name">MOTOPARTS</h1>
+                <h1 class="company-name">ELYTA</h1>
                 <p class="company-subtitle">Tu mejor opción en repuestos para motos</p>
                 <h2 style="color: #0066cc; margin: 10px 0;">COTIZACIÓN #' . $cotizacion->id . '</h2>
             </div>
@@ -487,7 +351,7 @@ class CotizacionController extends Controller
 
             <div class="footer">
                 <p>Generado automáticamente el ' . date('d/m/Y H:i') . '</p>
-                <p>MOTOPARTS - Tu mejor opción en repuestos para motos</p>
+                <p>ELYTA - Tu mejor opción en repuestos para motos</p>
             </div>
         </body>
         </html>';

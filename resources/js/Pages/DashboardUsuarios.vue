@@ -47,15 +47,44 @@
 
     <!-- Navbar -->
     <nav class="navbar">
-      <div class="container navbar-content">
-        <a :href="getAppUrl('/')" class="navbar-logo">MOTO<span>PARTS</span></a>
+      <div class="navbar-content" style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0 2rem;">
+        <a :href="getAppUrl('/')" class="navbar-logo">ELYTA</a>
         
-        <ul class="navbar-menu">
+        <ul class="navbar-menu" style="flex: 1; display: flex; justify-content: center;">
           <li><a :href="getAppUrl('/dashboard')" class="navbar-link">Dashboard</a></li>
-          <li><a :href="getAppUrl('/dashboard/productos')" class="navbar-link">Productos</a></li>
-          <li><a :href="getAppUrl('/dashboard/categorias')" class="navbar-link">Categorías</a></li>
-          <li><a :href="getAppUrl('/dashboard/usuarios')" class="navbar-link">Usuarios</a></li>
-          <li><a :href="getAppUrl('/dashboard/ventas')" class="navbar-link">Ventas</a></li>
+          
+          <li class="navbar-dropdown">
+            <button @click="toggleDropdown('usuarios')" class="navbar-link dropdown-toggle">Gestión Usuarios</button>
+            <div v-if="dropdownOpen === 'usuarios'" class="dropdown-menu">
+              <a :href="getAppUrl('/dashboard/usuarios')" class="dropdown-item">Usuarios</a>
+              <a :href="getAppUrl('/dashboard/proveedores')" class="dropdown-item">Proveedores</a>
+            </div>
+          </li>
+          
+          <li class="navbar-dropdown">
+            <button @click="toggleDropdown('ventas')" class="navbar-link dropdown-toggle">Gestión Ventas</button>
+            <div v-if="dropdownOpen === 'ventas'" class="dropdown-menu">
+              <a :href="getAppUrl('/dashboard/productos')" class="dropdown-item">Productos</a>
+              <a :href="getAppUrl('/dashboard/categorias')" class="dropdown-item">Categorías</a>
+              <a :href="getAppUrl('/dashboard/transacciones')" class="dropdown-item">Transacciones</a>
+              <a :href="getAppUrl('/dashboard/ventas-credito')" class="dropdown-item">Ventas al Crédito</a>
+            </div>
+          </li>
+          
+          <li class="navbar-dropdown">
+            <button @click="toggleDropdown('cotizaciones')" class="navbar-link dropdown-toggle">Gestión Cotizaciones</button>
+            <div v-if="dropdownOpen === 'cotizaciones'" class="dropdown-menu">
+              <a :href="getAppUrl('/dashboard/cotizaciones')" class="dropdown-item">Cotizaciones</a>
+            </div>
+          </li>
+          
+          <li class="navbar-dropdown">
+            <button @click="toggleDropdown('devoluciones')" class="navbar-link dropdown-toggle">Gestión Devoluciones</button>
+            <div v-if="dropdownOpen === 'devoluciones'" class="dropdown-menu">
+              <a :href="getAppUrl('/dashboard/devoluciones')" class="dropdown-item">Devoluciones Clientes</a>
+              <a :href="getAppUrl('/dashboard/devoluciones-proveedor')" class="dropdown-item">Devoluciones Proveedores</a>
+            </div>
+          </li>
         </ul>
 
         <div class="navbar-controls">
@@ -172,7 +201,18 @@
     <!-- Footer -->
     <footer class="footer">
       <div class="container">
-        <p>&copy; 2025 MotoParts. Todos los derechos reservados.</p>
+        <h3 class="footer-title">ELYTA</h3>
+        <p class="footer-text">Tu mejor opción en repuestos para motos</p>
+        <div class="footer-social">
+          <a href="#">Facebook</a>
+          <a href="#">Instagram</a>
+          <a href="#">WhatsApp</a>
+        </div>
+        <p style="color: #6b7280; font-size: 14px;">&copy; 2025 ELYTA. Todos los derechos reservados.</p>
+        
+        <div class="footer-counter">
+          Visitas en esta página: <strong>{{ contadorVisitas }}</strong>
+        </div>
       </div>
     </footer>
   </div>
@@ -231,6 +271,9 @@ watch(highContrast, (val) => localStorage.setItem('highContrast', val));
 watch(manualNightMode, (val) => localStorage.setItem('manualNightMode', val));
 watch(autoNightMode, (val) => localStorage.setItem('autoNightMode', val));
 
+// Contador de visitas
+const contadorVisitas = ref(0);
+
 // Usuario
 const usuario = ref(null);
 const userMenuOpen = ref(false);
@@ -256,6 +299,13 @@ const cerrarSesion = () => {
   window.location.href = getAppUrl('/');
 };
 
+// Dropdowns
+const dropdownOpen = ref(null);
+
+const toggleDropdown = (menu) => {
+  dropdownOpen.value = dropdownOpen.value === menu ? null : menu;
+};
+
 // CRUD
 const usuarios = ref([]);
 const modalAbierto = ref(false);
@@ -274,9 +324,7 @@ const form = ref({
 const cargarUsuarios = async () => {
   const token = localStorage.getItem('token');
   try {
-    const response = await apiFetch('/api/usuarios', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
+    const response = await apiFetch('/api/usuarios');
     const data = await response.json();
     usuarios.value = (data.data || []).map(u => ({
       ...u,
@@ -327,12 +375,8 @@ const guardar = async () => {
   const method = editando.value ? 'PUT' : 'POST';
 
   try {
-    const response = await fetch(url, {
+    const response = await apiFetch(url, {
       method,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify(form.value)
     });
 
@@ -355,8 +399,7 @@ const eliminar = async (id) => {
   const token = localStorage.getItem('token');
   try {
     const response = await apiFetch(`/api/usuarios/${id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token}` }
+      method: 'DELETE'
     });
 
     if (response.ok) {
@@ -371,7 +414,41 @@ const eliminar = async (id) => {
   }
 };
 
-onMounted(() => {
+const registrarVisita = async () => {
+  try {
+    const response = await apiFetch('/api/visitas/dashboard-usuarios', {
+      method: 'POST'
+    });
+    const data = await response.json();
+    if (data.success) {
+      contadorVisitas.value = data.visitas;
+    }
+  } catch (error) {
+    console.error('Error al registrar visita:', error);
+  }
+};
+
+onMounted(async () => {
+  // Verificar rol del usuario
+  const userData = localStorage.getItem('user');
+  if (userData) {
+    try {
+      const user = JSON.parse(userData);
+      if (user.rol !== 'Propietario' && user.rol !== 'Vendedor') {
+        window.location.href = getAppUrl('/');
+        return;
+      }
+    } catch (error) {
+      console.error('Error al verificar usuario:', error);
+      window.location.href = getAppUrl('/');
+      return;
+    }
+  } else {
+    window.location.href = getAppUrl('/login');
+    return;
+  }
+  
+  await registrarVisita();
   cargarUsuarios();
 });
 </script>
@@ -408,5 +485,55 @@ onMounted(() => {
 .form-input:focus {
   outline: none;
   border-color: var(--color-primary);
+}
+
+.navbar-dropdown {
+  position: relative;
+}
+
+.dropdown-toggle {
+  color: #000000;
+  text-decoration: none;
+  font-weight: 500;
+  transition: var(--transition);
+  font-size: var(--font-size-base);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.theme-night .dropdown-toggle {
+  color: var(--color-accent);
+}
+
+.dropdown-toggle:hover {
+  color: var(--color-primary);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  min-width: 200px;
+  z-index: 1000;
+  margin-top: 0.5rem;
+}
+
+.dropdown-item {
+  display: block;
+  padding: 0.75rem 1rem;
+  color: var(--color-text);
+  text-decoration: none;
+  transition: var(--transition);
+  font-size: var(--font-size-base);
+}
+
+.dropdown-item:hover {
+  background-color: var(--color-bg-alt);
+  color: var(--color-primary);
 }
 </style>

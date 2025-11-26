@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
+use App\Models\Pago;
 
 class PagoController extends Controller
 {
@@ -20,6 +20,51 @@ class PagoController extends Controller
         $this->tokenSecret = env('PAGOFACIL_TOKEN_SECRET');
         $this->apiUrl = 'https://masterqr.pagofacil.com.bo/api/services/v2';
         $this->loginUrl = $this->apiUrl . '/login';
+    }
+
+    public function index()
+    {
+        try {
+            $pagos = Pago::obtenerTodos();
+
+            return response()->json([
+                'success' => true,
+                'data' => $pagos
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener pagos',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function show($id)
+    {
+        try {
+            $pago = Pago::obtenerPorId($id);
+
+            if (!$pago) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pago no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $pago
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener el pago',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     private function getAccessToken()
@@ -187,74 +232,49 @@ class PagoController extends Controller
                     ], 400);
                 }
                 
-                // Primero crear la venta pendiente
-                // Usar vendedor_id = 3 (sistema) para ventas online
-                $ventaId = DB::table('venta')->insertGetId([
-                    'fecha_venta' => now(),
-                    'tipo' => 'contado',
-                    'total' => $total,
-                    'estado' => 'pendiente',
-                    'cliente_id' => $clienteId,
-                    'vendedor_id' => 3, // Vendedor del sistema para ventas online
-                    'cotizacion_id' => null
+                // Obtener cotizacion_id si existe
+                $cotizacionId = $request->input('cotizacion_id');
+                
+                $resultado = Pago::crearVentaConDetalles($clienteId, $productos, $total, $cotizacionId);
+                $ventaId = $resultado['venta_id'];
+                $pagoId = $resultado['pago_id'];
+
+                $qrImage = $pagoFacilResponse['values']['qrBase64'] ?? null;
+                $transactionId = $pagoFacilResponse['values']['transactionId'] ?? null;
+
+                if ($qrImage && !str_starts_with($qrImage, 'data:image')) {
+                    $qrImage = 'data:image/png;base64,' . $qrImage;
+                }
+                
+                Cache::put('qr_' . $pagoId, [
+                    'payment_number' => $paymentNumber,
+                    'transaction_id' => $transactionId,
+                    'qr_image' => $qrImage,
+                    'venta_id' => $ventaId,
+                    'productos' => $productos
+                ], now()->addHours(2));
+                
+                Cache::put('payment_' . $paymentNumber, [
+                    'pago_id' => $pagoId,
+                    'venta_id' => $ventaId
+                ], now()->addHours(2));
+
+                return response()->json([
+                    'success' => true,
+                    'pago_id' => $pagoId,
+                    'qr_image' => $qrImage,
+                    'transaction_id' => $transactionId,
+                    'payment_number' => $paymentNumber,
+                    'total' => $total
                 ]);
 
-                foreach ($productos as $producto) {
-                    DB::table('detalle_venta')->insert([
-                        'cantidad' => $producto['cantidad'],
-                        'precio_unitario' => $producto['costo_unitario'],
-                        'subtotal' => $producto['cantidad'] * $producto['costo_unitario'],
-                        'venta_id' => $ventaId,
-                        'producto_id' => $producto['producto_id']
-                    ]);
-                }
-
-            $pagoId = DB::table('pago')->insertGetId([
-                'monto' => $total,
-                'metodo' => 'qr',
-                'fecha_pago' => now(),
-                'venta_id' => $ventaId
-            ]);
-
-            $qrImage = $pagoFacilResponse['values']['qrBase64'] ?? null;
-            $transactionId = $pagoFacilResponse['values']['transactionId'] ?? null;
-
-            // Agregar prefijo si la imagen no lo tiene
-            if ($qrImage && !str_starts_with($qrImage, 'data:image')) {
-                $qrImage = 'data:image/png;base64,' . $qrImage;
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Error al generar QR: ' . $response->body(),
+                    'status' => $response->status()
+                ], 500);
             }
-            
-            // Guardar en cache el QR con el payment_number como key adicional
-            Cache::put('qr_' . $pagoId, [
-                'payment_number' => $paymentNumber,
-                'transaction_id' => $transactionId,
-                'qr_image' => $qrImage,
-                'venta_id' => $ventaId,
-                'productos' => $productos
-            ], now()->addHours(2));
-            
-            // Guardar también con payment_number como key para búsqueda rápida
-            Cache::put('payment_' . $paymentNumber, [
-                'pago_id' => $pagoId,
-                'venta_id' => $ventaId
-            ], now()->addHours(2));
-
-            return response()->json([
-                'success' => true,
-                'pago_id' => $pagoId,
-                'qr_image' => $qrImage,
-                'transaction_id' => $transactionId,
-                'payment_number' => $paymentNumber,
-                'total' => $total
-            ]);
-
-        } else {
-            return response()->json([
-                'success' => false,
-                'error' => 'Error al generar QR: ' . $response->body(),
-                'status' => $response->status()
-            ], 500);
-        }
 
         } catch (\Exception $e) {
             \Log::error('Error en generarQR: ' . $e->getMessage());
@@ -275,24 +295,16 @@ class PagoController extends Controller
             $estado = $data['Estado'] ?? null;
 
             if ($pedidoId) {
-                // Buscar directamente con el payment_number
                 $paymentData = Cache::get('payment_' . $pedidoId);
                 
                 \Log::info('Buscando pago:', ['pedido_id' => $pedidoId, 'encontrado' => $paymentData ? 'si' : 'no']);
 
                 if ($paymentData) {
-                    // Estado 2 = completado en PagoFácil
                     if ($estado == 2) {
-                        DB::table('venta')
-                            ->where('id', $paymentData['venta_id'])
-                            ->update(['estado' => 'pagada']);
-                        
+                        Pago::actualizarEstadoVenta($paymentData['venta_id'], 'pagada');
                         \Log::info('Venta completada:', ['venta_id' => $paymentData['venta_id'], 'pedido_id' => $pedidoId]);
                     } else {
-                        DB::table('venta')
-                            ->where('id', $paymentData['venta_id'])
-                            ->update(['estado' => 'pendiente']);
-                        
+                        Pago::actualizarEstadoVenta($paymentData['venta_id'], 'pendiente');
                         \Log::warning('Pago fallido:', ['venta_id' => $paymentData['venta_id'], 'estado' => $estado]);
                     }
                 } else {
@@ -321,11 +333,7 @@ class PagoController extends Controller
     public function consultarEstado($pagoId)
     {
         try {
-            $pago = DB::table('pago')
-                ->join('venta', 'pago.venta_id', '=', 'venta.id')
-                ->where('pago.id', $pagoId)
-                ->select('pago.*', 'venta.estado as venta_estado')
-                ->first();
+            $pago = Pago::consultarEstadoPago($pagoId);
 
             if (!$pago) {
                 return response()->json(['error' => 'Pago no encontrado'], 404);

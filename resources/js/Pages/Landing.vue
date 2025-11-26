@@ -55,7 +55,7 @@
     <!-- Navbar -->
     <nav class="navbar">
       <div class="container navbar-content">
-        <a :href="getAppUrl('/')" class="navbar-logo">MOTO<span>PARTS</span></a>
+        <a :href="getAppUrl('/')" class="navbar-logo">ELYTA</a>
         
         <ul class="navbar-menu">
           <li><a :href="getAppUrl('/')" class="navbar-link">Inicio</a></li>
@@ -74,6 +74,8 @@
               <div v-if="userMenuOpen" class="user-menu">
                 <a :href="getAppUrl('/perfil')" class="user-menu-item">Mi perfil</a>
                 <a :href="getAppUrl('/mis-cotizaciones')" class="user-menu-item">Mis cotizaciones</a>
+                <a :href="getAppUrl('/mis-compras')" class="user-menu-item">Mis compras</a>
+                <a :href="getAppUrl('/mis-devoluciones')" class="user-menu-item">Mis devoluciones</a>
                 <button @click="cerrarSesion" class="user-menu-item">Cerrar sesión</button>
               </div>
             </div>
@@ -195,7 +197,7 @@
               <Mail :size="32" />
             </div>
             <h3 class="card-title contact-card-title">Email</h3>
-            <p class="contact-card-text">contacto@motoparts.com</p>
+            <p class="contact-card-text">contacto@ELYTA.com</p>
           </div>
           <div class="feature-card contact-card">
             <div class="feature-icon">
@@ -211,14 +213,14 @@
     <!-- Footer -->
     <footer class="footer">
       <div class="container">
-        <h3 class="footer-title">MOTO<span class="highlight">PARTS</span></h3>
+        <h3 class="footer-title">ELYTA</h3>
         <p class="footer-text">Tu mejor opción en repuestos para motos</p>
         <div class="footer-social">
           <a href="#">Facebook</a>
           <a href="#">Instagram</a>
           <a href="#">WhatsApp</a>
         </div>
-        <p style="color: #6b7280; font-size: 14px;">&copy; 2025 MotoParts. Todos los derechos reservados.</p>
+        <p style="color: #6b7280; font-size: 14px;">&copy; 2025 ELYTA. Todos los derechos reservados.</p>
         
         <div class="footer-counter">
           Visitas en esta página: <strong>{{ contadorVisitas }}</strong>
@@ -337,8 +339,7 @@ const toggleAccessibilityPanel = () => {
 const registrarVisita = async () => {
   try {
     const response = await apiFetch('/api/visitas/landing', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      method: 'POST'
     });
     const data = await response.json();
     if (data.success) {

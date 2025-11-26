@@ -20,14 +20,7 @@
 
       <div class="control-group">
         <label>Tamaño de fuente: {{ fontSizeLabel }}</label>
-        <input 
-          type="range" 
-          v-model.number="fontSize" 
-          min="12" 
-          max="24" 
-          step="2"
-          style="width: 100%;"
-        >
+        <input type="range" v-model.number="fontSize" min="12" max="24" step="2" style="width: 100%;">
       </div>
 
       <div class="control-group">
@@ -109,32 +102,120 @@
       </div>
     </nav>
 
-    <!-- Dashboard Content -->
+    <!-- Content -->
     <section class="section" style="background-color: var(--color-bg);">
       <div style="padding: 0 2rem;">
-        <h1 class="section-title">Panel de Administración</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+          <h1 class="section-title" style="margin-bottom: 0;">Gestión de Cotizaciones</h1>
+        </div>
 
-        <!-- Estadísticas -->
-        <div class="grid grid-cols-4" style="margin-bottom: 3rem;">
-          <div class="card" style="text-align: center; padding: 2rem;">
-            <h3 style="font-size: 2.5rem; color: var(--color-primary); margin-bottom: 0.5rem;">{{ stats.productos }}</h3>
-            <p style="color: var(--color-text-light); font-weight: 600;">Productos</p>
-          </div>
-          <div class="card" style="text-align: center; padding: 2rem;">
-            <h3 style="font-size: 2.5rem; color: var(--color-primary); margin-bottom: 0.5rem;">{{ stats.categorias }}</h3>
-            <p style="color: var(--color-text-light); font-weight: 600;">Categorías</p>
-          </div>
-          <div class="card" style="text-align: center; padding: 2rem;">
-            <h3 style="font-size: 2.5rem; color: var(--color-primary); margin-bottom: 0.5rem;">{{ stats.usuarios }}</h3>
-            <p style="color: var(--color-text-light); font-weight: 600;">Usuarios</p>
-          </div>
-          <div class="card" style="text-align: center; padding: 2rem;">
-            <h3 style="font-size: 2.5rem; color: var(--color-primary); margin-bottom: 0.5rem;">{{ stats.ventas }}</h3>
-            <p style="color: var(--color-text-light); font-weight: 600;">Ventas</p>
-          </div>
+        <!-- Tabla de Cotizaciones -->
+        <div class="card" style="padding: 0; overflow: hidden;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead style="background-color: var(--color-bg-alt);">
+              <tr>
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--color-text);">ID</th>
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--color-text);">Cliente</th>
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--color-text);">Vendedor</th>
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--color-text);">Fecha</th>
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--color-text);">Total</th>
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--color-text);">Estado</th>
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--color-text);">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="cotizacion in cotizaciones" :key="cotizacion.id" style="border-top: 1px solid var(--color-border);">
+                <td style="padding: 1rem; color: var(--color-text);">#{{ cotizacion.id }}</td>
+                <td style="padding: 1rem; color: var(--color-text-light);">{{ cotizacion.cliente_nombre }}</td>
+                <td style="padding: 1rem; color: var(--color-text-light);">{{ cotizacion.vendedor_nombre || 'N/A' }}</td>
+                <td style="padding: 1rem; color: var(--color-text-light);">{{ formatDate(cotizacion.fecha_cotizacion) }}</td>
+                <td style="padding: 1rem; color: var(--color-text-light);">Bs {{ cotizacion.total }}</td>
+                <td style="padding: 1rem; color: var(--color-text-light);">{{ cotizacion.estado }}</td>
+                <td style="padding: 1rem;">
+                  <button @click="verDetalleCotizacion(cotizacion)" style="color: var(--color-primary); background: none; border: none; cursor: pointer;">Ver detalle</button>
+                </td>
+              </tr>
+              <tr v-if="cotizaciones.length === 0">
+                <td colspan="7" style="padding: 2rem; text-align: center; color: var(--color-text-light);">
+                  No hay cotizaciones registradas
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
+
+    <!-- Modal Detalle Cotización -->
+    <div v-if="modalDetalleAbierto" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 1rem;">
+      <div class="card" style="width: 100%; max-width: 600px; max-height: fit-content; overflow: visible;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--color-border); padding-bottom: 0.75rem;">
+          <h2 style="font-size: 1.25rem; font-weight: bold; color: var(--color-text); margin: 0;">
+            Cotización #{{ cotizacionSeleccionada?.id }}
+          </h2>
+          <button @click="cerrarModal" style="background: none; border: none; font-size: 1.25rem; cursor: pointer; color: var(--color-text);">&times;</button>
+        </div>
+
+        <div v-if="cotizacionSeleccionada">
+          <!-- Información básica -->
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-bottom: 1rem; padding: 0.75rem; background-color: var(--color-bg-alt); border-radius: 0.5rem;">
+            <div>
+              <strong style="color: var(--color-text);">Cliente:</strong>
+              <span style="color: var(--color-text-light); margin-left: 0.5rem;">{{ cotizacionSeleccionada.cliente_nombre }}</span>
+            </div>
+            <div>
+              <strong style="color: var(--color-text);">Vendedor:</strong>
+              <span style="color: var(--color-text-light); margin-left: 0.5rem;">{{ cotizacionSeleccionada.vendedor_nombre || 'N/A' }}</span>
+            </div>
+            <div>
+              <strong style="color: var(--color-text);">Fecha:</strong>
+              <span style="color: var(--color-text-light); margin-left: 0.5rem;">{{ formatDate(cotizacionSeleccionada.fecha_cotizacion) }}</span>
+            </div>
+            <div>
+              <strong style="color: var(--color-text);">Total:</strong>
+              <span style="color: var(--color-text-light); margin-left: 0.5rem;">Bs {{ cotizacionSeleccionada.total }}</span>
+            </div>
+            <div>
+              <strong style="color: var(--color-text);">Estado:</strong>
+              <span style="color: var(--color-text-light); margin-left: 0.5rem;">{{ cotizacionSeleccionada.estado }}</span>
+            </div>
+            <div>
+              <strong style="color: var(--color-text);">Total productos:</strong>
+              <span style="color: var(--color-text-light); margin-left: 0.5rem;">{{ cotizacionSeleccionada.productos?.length || 0 }}</span>
+            </div>
+          </div>
+
+          <!-- Detalles de productos -->
+          <div v-if="cotizacionSeleccionada.productos && cotizacionSeleccionada.productos.length > 0" style="margin-bottom: 1rem;">
+            <strong style="color: var(--color-text); display: block; margin-bottom: 0.5rem;">Productos cotizados:</strong>
+            <div style="background-color: var(--color-bg-alt); border-radius: 0.5rem; overflow: hidden;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <thead style="background-color: var(--color-border);">
+                  <tr>
+                    <th style="padding: 0.5rem; text-align: left; font-size: 0.875rem; color: var(--color-text);">Producto</th>
+                    <th style="padding: 0.5rem; text-align: center; font-size: 0.875rem; color: var(--color-text);">Cantidad</th>
+                    <th style="padding: 0.5rem; text-align: right; font-size: 0.875rem; color: var(--color-text);">Precio</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="producto in cotizacionSeleccionada.productos" :key="producto.id">
+                    <td style="padding: 0.5rem; color: var(--color-text-light); font-size: 0.875rem;">{{ producto.producto_nombre }}</td>
+                    <td style="padding: 0.5rem; text-align: center; color: var(--color-text-light); font-size: 0.875rem;">{{ producto.cantidad }}</td>
+                    <td style="padding: 0.5rem; text-align: right; color: var(--color-text-light); font-size: 0.875rem;">
+                      Bs. {{ producto.costo_unitario }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; border-top: 1px solid var(--color-border); padding-top: 0.75rem; margin-top: 1rem;">
+          <button @click="cerrarModal" class="btn btn-secondary">Cerrar</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Footer -->
     <footer class="footer">
@@ -159,10 +240,9 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
 import { User } from 'lucide-vue-next';
-import { useApi } from '../composables/useApi';
-const { apiFetch, getAppUrl } = useApi();
+import { useApi } from '../composables/useApi.js';
 
-// Accesibilidad
+// Configuración de accesibilidad
 const accessibilityPanelOpen = ref(false);
 const currentTheme = ref(localStorage.getItem('theme') || 'theme-adults');
 const fontSize = ref(parseInt(localStorage.getItem('fontSize')) || 16);
@@ -185,9 +265,7 @@ const fontSizeClass = computed(() => {
 });
 
 const isNightMode = computed(() => {
-  if (!autoNightMode.value) {
-    return manualNightMode.value;
-  }
+  if (!autoNightMode.value) return manualNightMode.value;
   const hora = new Date().getHours();
   return hora >= 19 || hora < 7;
 });
@@ -214,7 +292,8 @@ watch(autoNightMode, (val) => localStorage.setItem('autoNightMode', val));
 // Contador de visitas
 const contadorVisitas = ref(0);
 
-// Usuario
+// Usuario y autenticación
+const { apiFetch, getAppUrl } = useApi();
 const usuario = ref(null);
 const userMenuOpen = ref(false);
 
@@ -223,7 +302,6 @@ if (usuarioData) {
   try {
     usuario.value = JSON.parse(usuarioData);
   } catch (error) {
-    console.error('Error al parsear usuario:', error);
     window.location.href = getAppUrl('/login');
   }
 } else {
@@ -247,42 +325,75 @@ const toggleDropdown = (menu) => {
   dropdownOpen.value = dropdownOpen.value === menu ? null : menu;
 };
 
-// Estadísticas
-const stats = ref({
-  productos: 0,
-  categorias: 0,
-  usuarios: 0,
-  ventas: 0
-});
+// Estado del dashboard
+const cotizaciones = ref([]);
 
-const cargarEstadisticas = async () => {
-  const token = localStorage.getItem('token');
-  
+// Modal
+const modalDetalleAbierto = ref(false);
+const cotizacionSeleccionada = ref(null);
+
+const verDetalleCotizacion = async (cotizacion) => {
   try {
-    // Cargar productos
-    const productosRes = await apiFetch('/api/productos');
-    const productosData = await productosRes.json();
-    stats.value.productos = productosData.data?.length || 0;
-
-    // Cargar categorías
-    const categoriasRes = await apiFetch('/api/categorias');
-    const categoriasData = await categoriasRes.json();
-    stats.value.categorias = categoriasData.data?.length || 0;
-
-    // Cargar usuarios
-    const usuariosRes = await apiFetch('/api/usuarios');
-    const usuariosData = await usuariosRes.json();
-    stats.value.usuarios = usuariosData.data?.length || 0;
-
-    stats.value.ventas = 0; // Placeholder hasta implementar ventas
+    // Cargar los detalles completos desde la API
+    const response = await apiFetch(`/api/cotizaciones/${cotizacion.id}/detalle`);
+    const data = await response.json();
+    
+    // El backend puede devolver {success, data} o directamente los datos
+    if (data.success && data.data) {
+      cotizacionSeleccionada.value = data.data;
+    } else if (!data.error) {
+      // Si no hay error y no tiene estructura success/data, usar los datos directamente
+      cotizacionSeleccionada.value = data;
+    } else {
+      // Fallback con los datos básicos si falla la API
+      cotizacionSeleccionada.value = { ...cotizacion, productos: [] };
+    }
   } catch (error) {
-    console.error('Error al cargar estadísticas:', error);
+    console.error('Error al cargar detalles:', error);
+    // Fallback con los datos básicos en caso de error
+    cotizacionSeleccionada.value = { ...cotizacion, productos: [] };
+  }
+  
+  modalDetalleAbierto.value = true;
+};
+
+const cerrarModal = () => {
+  modalDetalleAbierto.value = false;
+  cotizacionSeleccionada.value = null;
+};
+
+// Funciones utilitarias
+const formatDate = (dateString) => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('es-ES', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+};
+
+// Cargar datos
+const cargarCotizaciones = async () => {
+  try {
+    const response = await apiFetch('/api/cotizaciones');
+    const data = await response.json();
+    // El backend devuelve directamente el array, no {success, data}
+    if (Array.isArray(data)) {
+      cotizaciones.value = data;
+    } else {
+      console.error('Error al cargar cotizaciones:', data.message || data.error);
+      cotizaciones.value = [];
+    }
+  } catch (error) {
+    console.error('Error al cargar cotizaciones:', error);
+    cotizaciones.value = [];
   }
 };
 
 const registrarVisita = async () => {
   try {
-    const response = await apiFetch('/api/visitas/dashboard', {
+    const response = await apiFetch('/api/visitas/dashboard-cotizaciones', {
       method: 'POST'
     });
     const data = await response.json();
@@ -300,7 +411,6 @@ onMounted(async () => {
   if (userData) {
     try {
       const user = JSON.parse(userData);
-      // Si no es Propietario o Vendedor, redirigir a landing
       if (user.rol !== 'Propietario' && user.rol !== 'Vendedor') {
         window.location.href = getAppUrl('/');
         return;
@@ -311,13 +421,12 @@ onMounted(async () => {
       return;
     }
   } else {
-    // Si no hay usuario logueado, redirigir a login
     window.location.href = getAppUrl('/login');
     return;
   }
   
   await registrarVisita();
-  cargarEstadisticas();
+  cargarCotizaciones();
 });
 </script>
 

@@ -3,43 +3,20 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use App\Models\Producto;
+use App\Models\Categoria;
 
 class ProductoController extends Controller
 {
-    /**
-     * Listar todos los productos
-     */
     public function index()
     {
         try {
-            $productos = DB::select(
-                'SELECT p.*, c.nombre as categoria_nombre 
-                 FROM producto p 
-                 LEFT JOIN categoria c ON p.categoria_id = c.id 
-                 ORDER BY p.id'
-            );
-
-            // Formatear respuesta con categoria como objeto simple
-            $productosFormateados = array_map(function($p) {
-                return [
-                    'id' => $p->id,
-                    'nombre' => $p->nombre,
-                    'descripcion' => $p->descripcion,
-                    'precio' => $p->precio_unitario,
-                    'stock' => $p->stock_actual,
-                    'imagen' => $p->imagen_url,
-                    'categoria_id' => $p->categoria_id,
-                    'categoria' => $p->categoria_nombre ? [
-                        'nombre' => $p->categoria_nombre
-                    ] : null
-                ];
-            }, $productos);
+            $productos = Producto::obtenerTodosConCategoria();
 
             return response()->json([
                 'success' => true,
-                'data' => $productosFormateados
+                'data' => $productos
             ], 200);
 
         } catch (\Exception $e) {
@@ -51,22 +28,12 @@ class ProductoController extends Controller
         }
     }
 
-    /**
-     * Obtener un producto por ID
-     */
     public function show($id)
     {
         try {
-            $productos = DB::select(
-                'SELECT p.*, c.nombre as categoria_nombre 
-                 FROM producto p 
-                 LEFT JOIN categoria c ON p.categoria_id = c.id 
-                 WHERE p.id = ? 
-                 LIMIT 1',
-                [$id]
-            );
+            $producto = Producto::obtenerPorIdConCategoria($id);
 
-            if (empty($productos)) {
+            if (!$producto) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Producto no encontrado'
@@ -75,7 +42,7 @@ class ProductoController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $productos[0]
+                'data' => $producto
             ], 200);
 
         } catch (\Exception $e) {
@@ -87,18 +54,22 @@ class ProductoController extends Controller
         }
     }
 
-    /**
-     * Crear nuevo producto
-     */
     public function store(Request $request)
     {
+        if (!Categoria::obtenerPorId($request->categoria_id)) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['categoria_id' => ['La categoría seleccionada no existe']]
+            ], 422);
+        }
+
         $validator = Validator::make($request->all(), [
             'nombre' => 'required|string|max:255',
             'descripcion' => 'nullable|string',
             'stock_actual' => 'required|integer|min:0',
             'precio_unitario' => 'required|numeric|min:0',
             'imagen_url' => 'nullable|string|max:255',
-            'categoria_id' => 'required|integer|exists:categoria,id'
+            'categoria_id' => 'required|integer'
         ], [
             'nombre.required' => 'El nombre es obligatorio',
             'stock_actual.required' => 'El stock es obligatorio',
@@ -107,8 +78,7 @@ class ProductoController extends Controller
             'precio_unitario.required' => 'El precio es obligatorio',
             'precio_unitario.numeric' => 'El precio debe ser un número',
             'precio_unitario.min' => 'El precio no puede ser negativo',
-            'categoria_id.required' => 'La categoría es obligatoria',
-            'categoria_id.exists' => 'La categoría seleccionada no existe'
+            'categoria_id.required' => 'La categoría es obligatoria'
         ]);
 
         if ($validator->fails()) {
@@ -119,31 +89,7 @@ class ProductoController extends Controller
         }
 
         try {
-            $creado_en = date('Y-m-d H:i:s');
-            
-            DB::insert(
-                'INSERT INTO producto (nombre, descripcion, stock_actual, precio_unitario, creado_en, imagen_url, categoria_id) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [
-                    $request->nombre,
-                    $request->descripcion,
-                    $request->stock_actual,
-                    $request->precio_unitario,
-                    $creado_en,
-                    $request->imagen_url,
-                    $request->categoria_id
-                ]
-            );
-
-            $producto = DB::select(
-                'SELECT p.*, c.nombre as categoria_nombre 
-                 FROM producto p 
-                 LEFT JOIN categoria c ON p.categoria_id = c.id 
-                 WHERE p.nombre = ? AND p.creado_en = ?
-                 ORDER BY p.id DESC
-                 LIMIT 1',
-                [$request->nombre, $creado_en]
-            )[0];
+            $producto = Producto::crearNuevo($request->all());
 
             return response()->json([
                 'success' => true,
@@ -160,18 +106,22 @@ class ProductoController extends Controller
         }
     }
 
-    /**
-     * Actualizar producto
-     */
     public function update(Request $request, $id)
     {
-        $productos = DB::select('SELECT * FROM producto WHERE id = ? LIMIT 1', [$id]);
+        $producto = Producto::obtenerPorId($id);
         
-        if (empty($productos)) {
+        if (!$producto) {
             return response()->json([
                 'success' => false,
                 'message' => 'Producto no encontrado'
             ], 404);
+        }
+
+        if ($request->filled('categoria_id') && !Categoria::obtenerPorId($request->categoria_id)) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['categoria_id' => ['La categoría seleccionada no existe']]
+            ], 422);
         }
 
         $validator = Validator::make($request->all(), [
@@ -180,7 +130,7 @@ class ProductoController extends Controller
             'stock_actual' => 'sometimes|required|integer|min:0',
             'precio_unitario' => 'sometimes|required|numeric|min:0',
             'imagen_url' => 'nullable|string|max:255',
-            'categoria_id' => 'sometimes|required|integer|exists:categoria,id'
+            'categoria_id' => 'sometimes|required|integer'
         ], [
             'nombre.required' => 'El nombre es obligatorio',
             'stock_actual.required' => 'El stock es obligatorio',
@@ -189,8 +139,7 @@ class ProductoController extends Controller
             'precio_unitario.required' => 'El precio es obligatorio',
             'precio_unitario.numeric' => 'El precio debe ser un número',
             'precio_unitario.min' => 'El precio no puede ser negativo',
-            'categoria_id.required' => 'La categoría es obligatoria',
-            'categoria_id.exists' => 'La categoría seleccionada no existe'
+            'categoria_id.required' => 'La categoría es obligatoria'
         ]);
 
         if ($validator->fails()) {
@@ -201,30 +150,7 @@ class ProductoController extends Controller
         }
 
         try {
-            $productoActual = $productos[0];
-            
-            $nombre = $request->input('nombre', $productoActual->nombre);
-            $descripcion = $request->input('descripcion', $productoActual->descripcion);
-            $stock_actual = $request->input('stock_actual', $productoActual->stock_actual);
-            $precio_unitario = $request->input('precio_unitario', $productoActual->precio_unitario);
-            $imagen_url = $request->input('imagen_url', $productoActual->imagen_url);
-            $categoria_id = $request->input('categoria_id', $productoActual->categoria_id);
-
-            DB::update(
-                'UPDATE producto 
-                 SET nombre = ?, descripcion = ?, stock_actual = ?, precio_unitario = ?, imagen_url = ?, categoria_id = ? 
-                 WHERE id = ?',
-                [$nombre, $descripcion, $stock_actual, $precio_unitario, $imagen_url, $categoria_id, $id]
-            );
-
-            $productoActualizado = DB::select(
-                'SELECT p.*, c.nombre as categoria_nombre 
-                 FROM producto p 
-                 LEFT JOIN categoria c ON p.categoria_id = c.id 
-                 WHERE p.id = ? 
-                 LIMIT 1',
-                [$id]
-            )[0];
+            $productoActualizado = Producto::actualizarPorId($id, $request->all());
 
             return response()->json([
                 'success' => true,
@@ -241,22 +167,19 @@ class ProductoController extends Controller
         }
     }
 
-    /**
-     * Eliminar producto
-     */
     public function destroy($id)
     {
         try {
-            $productos = DB::select('SELECT * FROM producto WHERE id = ? LIMIT 1', [$id]);
+            $producto = Producto::obtenerPorId($id);
             
-            if (empty($productos)) {
+            if (!$producto) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Producto no encontrado'
                 ], 404);
             }
 
-            DB::delete('DELETE FROM producto WHERE id = ?', [$id]);
+            Producto::eliminarPorId($id);
 
             return response()->json([
                 'success' => true,
