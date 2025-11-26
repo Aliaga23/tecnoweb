@@ -222,13 +222,22 @@ class PagoController extends Controller
             // Agregar prefijo si la imagen no lo tiene
             if ($qrImage && !str_starts_with($qrImage, 'data:image')) {
                 $qrImage = 'data:image/png;base64,' . $qrImage;
-            }                Cache::put('qr_' . $pagoId, [
-                    'payment_number' => $paymentNumber,
-                    'transaction_id' => $transactionId,
-                    'qr_image' => $qrImage,
-                    'venta_id' => $ventaId,
-                    'productos' => $productos
-                ], now()->addHours(2));
+            }
+            
+            // Guardar en cache el QR con el payment_number como key adicional
+            Cache::put('qr_' . $pagoId, [
+                'payment_number' => $paymentNumber,
+                'transaction_id' => $transactionId,
+                'qr_image' => $qrImage,
+                'venta_id' => $ventaId,
+                'productos' => $productos
+            ], now()->addHours(2));
+            
+            // Guardar también con payment_number como key para búsqueda rápida
+            Cache::put('payment_' . $paymentNumber, [
+                'pago_id' => $pagoId,
+                'venta_id' => $ventaId
+            ], now()->addHours(2));
 
             return response()->json([
                 'success' => true,
@@ -264,34 +273,25 @@ class PagoController extends Controller
             $estado = $data['Estado'] ?? null;
 
             if ($pedidoId) {
-                $pagoData = null;
-                $pagoId = null;
+                // Buscar directamente con el payment_number
+                $paymentData = Cache::get('payment_' . $pedidoId);
                 
-                $cacheKeys = Cache::get('qr_keys', []);
-                
-                foreach ($cacheKeys as $key) {
-                    $data_cache = Cache::get($key);
-                    if ($data_cache && isset($data_cache['payment_number']) && $data_cache['payment_number'] === $pedidoId) {
-                        $pagoData = $data_cache;
-                        $pagoId = str_replace('qr_', '', $key);
-                        break;
-                    }
-                }
+                \Log::info('Buscando pago:', ['pedido_id' => $pedidoId, 'encontrado' => $paymentData ? 'si' : 'no']);
 
-                if ($pagoData && $pagoId) {
+                if ($paymentData) {
                     // Estado 2 = completado en PagoFácil
                     if ($estado == 2) {
                         DB::table('venta')
-                            ->where('id', $pagoData['venta_id'])
+                            ->where('id', $paymentData['venta_id'])
                             ->update(['estado' => 'completado']);
                         
-                        \Log::info('Venta completada:', ['venta_id' => $pagoData['venta_id'], 'pedido_id' => $pedidoId]);
+                        \Log::info('Venta completada:', ['venta_id' => $paymentData['venta_id'], 'pedido_id' => $pedidoId]);
                     } else {
                         DB::table('venta')
-                            ->where('id', $pagoData['venta_id'])
+                            ->where('id', $paymentData['venta_id'])
                             ->update(['estado' => 'fallido']);
                         
-                        \Log::warning('Pago fallido:', ['venta_id' => $pagoData['venta_id'], 'estado' => $estado]);
+                        \Log::warning('Pago fallido:', ['venta_id' => $paymentData['venta_id'], 'estado' => $estado]);
                     }
                 } else {
                     \Log::warning('No se encontró información del pago:', ['pedido_id' => $pedidoId]);
