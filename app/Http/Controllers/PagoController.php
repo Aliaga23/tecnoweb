@@ -283,13 +283,13 @@ class PagoController extends Controller
                     if ($estado == 2) {
                         DB::table('venta')
                             ->where('id', $paymentData['venta_id'])
-                            ->update(['estado' => 'completado']);
+                            ->update(['estado' => 'pagada']);
                         
                         \Log::info('Venta completada:', ['venta_id' => $paymentData['venta_id'], 'pedido_id' => $pedidoId]);
                     } else {
                         DB::table('venta')
                             ->where('id', $paymentData['venta_id'])
-                            ->update(['estado' => 'fallido']);
+                            ->update(['estado' => 'pendiente']);
                         
                         \Log::warning('Pago fallido:', ['venta_id' => $paymentData['venta_id'], 'estado' => $estado]);
                     }
