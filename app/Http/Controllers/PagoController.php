@@ -279,15 +279,22 @@ class PagoController extends Controller
                 }
 
                 if ($pagoData && $pagoId) {
-                    if (strtolower($estado) === 'completado' || strtolower($estado) === 'pagado') {
+                    // Estado 2 = completado en PagoFácil
+                    if ($estado == 2) {
                         DB::table('venta')
                             ->where('id', $pagoData['venta_id'])
                             ->update(['estado' => 'completado']);
+                        
+                        \Log::info('Venta completada:', ['venta_id' => $pagoData['venta_id'], 'pedido_id' => $pedidoId]);
                     } else {
                         DB::table('venta')
                             ->where('id', $pagoData['venta_id'])
                             ->update(['estado' => 'fallido']);
+                        
+                        \Log::warning('Pago fallido:', ['venta_id' => $pagoData['venta_id'], 'estado' => $estado]);
                     }
+                } else {
+                    \Log::warning('No se encontró información del pago:', ['pedido_id' => $pedidoId]);
                 }
             }
 
