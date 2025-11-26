@@ -150,13 +150,13 @@
             <p class="card-description">{{ producto.descripcion }}</p>
             <div class="card-footer">
               <span class="card-price">Bs. {{ producto.precio_unitario }}</span>
-              <button class="btn btn-primary">Ver más</button>
+              <a :href="getAppUrl(`/catalogo/${producto.id}`)" class="btn btn-primary">Ver más</a>
             </div>
           </div>
         </div>
 
         <div class="text-center mt-xl">
-          <a href="/catalogo" class="btn btn-primary">Ver Todos los Productos</a>
+          <a :href="getAppUrl('/catalogo')" class="btn btn-primary">Ver Todos los Productos</a>
         </div>
       </div>
     </section>

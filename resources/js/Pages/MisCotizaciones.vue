@@ -256,7 +256,7 @@ const cargarCotizaciones = async () => {
 };
 
 const verDetalles = async (cotizacionId) => {
-  window.location.href = `/cotizacion/${cotizacionId}`;
+  window.location.href = getAppUrl(`/cotizacion/${cotizacionId}`);
 };
 
 const descargarPDF = async (cotizacionId) => {
