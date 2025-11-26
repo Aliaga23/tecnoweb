@@ -331,13 +331,14 @@ const verificarEstado = async () => {
       if (intervalVerificacion.value) {
         clearInterval(intervalVerificacion.value);
       }
-    } else if (data.estado === 'fallido' || data.estado === 'pendiente') {
+    } else if (data.estado === 'fallido') {
       errorMessage.value = 'El pago falló. Intenta nuevamente.';
       estadoPago.value = 'error';
       if (intervalVerificacion.value) {
         clearInterval(intervalVerificacion.value);
       }
     }
+    // Si está pendiente, no hacer nada, seguir esperando
 
   } catch (error) {
     console.error('Error al verificar estado:', error);
