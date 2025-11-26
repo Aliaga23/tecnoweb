@@ -246,13 +246,15 @@ class PagoController extends Controller
                 'transaction_id' => $transactionId,
                 'payment_number' => $paymentNumber,
                 'total' => $total
-            ]);            } else {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Error al generar QR: ' . $response->body(),
-                    'status' => $response->status()
-                ], 500);
-            }
+            ]);
+
+        } else {
+            return response()->json([
+                'success' => false,
+                'error' => 'Error al generar QR: ' . $response->body(),
+                'status' => $response->status()
+            ], 500);
+        }
 
         } catch (\Exception $e) {
             \Log::error('Error en generarQR: ' . $e->getMessage());
