@@ -319,12 +319,7 @@ const cargarDetalleCotizacion = async () => {
       return;
     }
 
-    const response = await fetch(`/api/cotizaciones/${props.cotizacionId}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    const response = await apiFetch(`/api/cotizaciones/${props.cotizacionId}`);
 
     const data = await response.json();
     if (response.ok) {
@@ -348,11 +343,8 @@ const descargarPDF = async () => {
       return;
     }
 
-    const response = await fetch(`/api/cotizaciones/${props.cotizacionId}/pdf`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      }
+    const response = await apiFetch(`/api/cotizaciones/${props.cotizacionId}/pdf`, {
+      method: 'GET'
     });
 
     if (response.ok) {

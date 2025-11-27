@@ -287,7 +287,6 @@
           <option value="">Seleccione método</option>
           <option value="efectivo">Efectivo</option>
           <option value="qr">QR</option>
-          <option value="tarjeta">Tarjeta</option>
         </select>
       </div>
 
@@ -312,20 +311,25 @@
     <!-- Vista QR para escanear -->
     <div v-else-if="estadoPagoQR === 'escaneando'" style="text-align: center;">
       <div style="margin-bottom: 1rem;">
-        <img :src="pagoQRInfo?.qr_image" alt="Código QR" style="max-width: 300px; width: 100%; height: auto; border-radius: 0.5rem;">
+        <img :src="pagoQRInfo?.qr_image" alt="Código QR" style="max-width: 280px; width: 100%; height: auto; border-radius: 0.5rem; border: 2px solid var(--color-border);">
       </div>
       <div style="background-color: var(--color-bg-alt); padding: 1rem; border-radius: 0.375rem; margin-bottom: 1rem;">
         <p style="margin: 0 0 0.5rem 0; color: var(--color-text); font-weight: 600;">Monto a pagar:</p>
-        <p style="margin: 0; color: var(--color-primary); font-size: 1.5rem; font-weight: bold;">Bs. {{ montoPago.toFixed(2) }}</p>
+        <p style="margin: 0; color: #dc2626; font-size: 1.5rem; font-weight: bold;">Bs. {{ montoPago.toFixed(2) }}</p>
       </div>
-      <p style="color: var(--color-text); margin-bottom: 0.5rem;">Escanea el código QR con tu app de pagos</p>
+      <p style="color: var(--color-text); margin-bottom: 0.5rem; font-weight: 500;">Escanea el código QR con tu app de pagos</p>
       <p style="color: var(--color-text-light); font-size: 0.875rem;">Esperando confirmación del pago...</p>
+      <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border);">
+        <button @click="cerrarModalPago" class="btn btn-secondary" style="padding: 0.625rem 1.25rem; font-size: 0.9375rem;">Cancelar</button>
+      </div>
     </div>
 
     <!-- Vista pago completado -->
     <div v-else-if="estadoPagoQR === 'completado'" style="text-align: center; padding: 2rem;">
       <div style="color: #10b981; font-size: 3rem; margin-bottom: 1rem;">✓</div>
-      <div style="color: var(--color-text); font-size: 1.25rem; font-weight: bold;">¡Pago completado!</div>
+      <div style="color: var(--color-text); font-size: 1.25rem; font-weight: bold; margin-bottom: 0.5rem;">¡Pago completado!</div>
+      <p style="color: var(--color-text-light); font-size: 0.9375rem; margin-bottom: 1.5rem;">El pago ha sido registrado exitosamente</p>
+      <button @click="cerrarModalPagoCompletado" class="btn btn-primary" style="padding: 0.625rem 1.5rem; font-size: 0.9375rem;">Cerrar</button>
     </div>
   </div>
 </div>
@@ -661,6 +665,7 @@ const cerrarModalPago = () => {
   metodoPago.value = '';
   pagoQRInfo.value = null;
   estadoPagoQR.value = 'formulario';
+  procesandoPago.value = false;
   if (intervalVerificacionQR.value) {
     clearInterval(intervalVerificacionQR.value);
     intervalVerificacionQR.value = null;
@@ -678,9 +683,9 @@ const registrarPago = async () => {
     return;
   }
 
-  // Si es pago con QR, generar código QR
+  // Si es pago con QR, generar código QR para crédito
   if (metodoPago.value === 'qr') {
-    await generarQRPago();
+    await generarQRPagoCredito();
     return;
   }
 
@@ -688,7 +693,7 @@ const registrarPago = async () => {
   procesandoPago.value = true;
 
   try {
-    const response = await apiFetch(`/api/ventas/${ventaSeleccionada.value.id}/pagos`, {
+    const response = await apiFetch(`/api/ventas/${ventaSeleccionada.value.id}/pago-credito`, {
       method: 'POST',
       body: JSON.stringify({
         monto: montoPago.value,
@@ -713,27 +718,17 @@ const registrarPago = async () => {
   }
 };
 
-const generarQRPago = async () => {
+const generarQRPagoCredito = async () => {
   procesandoPago.value = true;
   estadoPagoQR.value = 'generando';
 
   try {
-    const user = usuario.value;
     const payload = {
-      cliente_id: user.id,
-      productos: [{
-        nombre: `Pago Venta #${ventaSeleccionada.value.id}`,
-        cantidad: 1,
-        costo_unitario: montoPago.value
-      }],
-      total: montoPago.value,
-      cliente_nombre: `${user.nombre} ${user.apellido}`,
-      cliente_ci: user.ci,
-      cliente_telefono: user.telefono || '00000000',
-      cliente_email: user.correo
+      venta_id: ventaSeleccionada.value.id,
+      monto: montoPago.value
     };
 
-    const response = await apiFetch('/api/generar-qr', {
+    const response = await apiFetch('/api/generar-qr-credito', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
@@ -745,7 +740,7 @@ const generarQRPago = async () => {
       estadoPagoQR.value = 'escaneando';
       
       // Iniciar verificación automática cada 5 segundos
-      intervalVerificacionQR.value = setInterval(verificarEstadoQR, 5000);
+      intervalVerificacionQR.value = setInterval(verificarEstadoQRCredito, 5000);
     } else {
       alert('Error al generar QR: ' + (data.error || 'Error desconocido'));
       estadoPagoQR.value = 'formulario';
@@ -759,53 +754,29 @@ const generarQRPago = async () => {
   }
 };
 
-const verificarEstadoQR = async () => {
+const verificarEstadoQRCredito = async () => {
   try {
-    if (!pagoQRInfo.value.pago_id) return;
+    if (!pagoQRInfo.value?.pago_id) return;
 
-    const response = await apiFetch(`/api/pago-estado/${pagoQRInfo.value.pago_id}`);
+    const response = await apiFetch(`/api/verificar-pago/${pagoQRInfo.value.pago_id}`);
     const data = await response.json();
 
-    if (data.estado === 'pagada') {
+    if (data.pagado) {
       estadoPagoQR.value = 'completado';
       if (intervalVerificacionQR.value) {
         clearInterval(intervalVerificacionQR.value);
-      }
-      
-      // Registrar el pago en la venta al crédito
-      await registrarPagoQRConfirmado();
-    } else if (data.estado === 'fallido') {
-      alert('El pago QR falló. Intenta nuevamente.');
-      estadoPagoQR.value = 'formulario';
-      if (intervalVerificacionQR.value) {
-        clearInterval(intervalVerificacionQR.value);
+        intervalVerificacionQR.value = null;
       }
     }
   } catch (error) {
-    console.error('Error al verificar estado QR:', error);
+    console.error('Error al verificar estado QR crédito:', error);
   }
 };
 
-const registrarPagoQRConfirmado = async () => {
-  try {
-    const response = await apiFetch(`/api/ventas/${ventaSeleccionada.value.id}/pagos`, {
-      method: 'POST',
-      body: JSON.stringify({
-        monto: montoPago.value,
-        metodo: 'qr'
-      })
-    });
-
-    const data = await response.json();
-    if (data.success) {
-      alert('Pago con QR completado exitosamente');
-      cerrarModalPago();
-      cerrarModal();
-      await cargarVentas();
-    }
-  } catch (error) {
-    console.error('Error al confirmar pago QR:', error);
-  }
+const cerrarModalPagoCompletado = async () => {
+  cerrarModalPago();
+  cerrarModal();
+  await cargarVentas();
 };
 
 // Funciones para modal crear venta
