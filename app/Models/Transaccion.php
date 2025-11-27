@@ -114,7 +114,7 @@ class Transaccion extends Model
 
             // Crear venta
             $venta_id = DB::table('venta')->insertGetId([
-                'fecha_venta' => now(),
+                'fecha_venta' => now()->addDay(),
                 'tipo' => 'credito',
                 'total' => $total,
                 'estado' => 'pendiente',
