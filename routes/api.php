@@ -14,6 +14,7 @@ use App\Http\Controllers\CompraController;
 use App\Http\Controllers\DevolucionController;
 use App\Http\Controllers\DevolucionProveedorController;
 use App\Http\Controllers\TransaccionController;
+use App\Http\Controllers\ImagenController;
 
 /*
 |--------------------------------------------------------------------------
@@ -77,6 +78,9 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/refresh', [AuthController::class, 'refresh']);
+    
+    // Upload de imágenes
+    Route::post('/upload-imagen', [ImagenController::class, 'upload']);
     
     // CRUD de Usuarios (solo Propietario - rol_id = 1)
     Route::middleware('role:1')->group(function () {

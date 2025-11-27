@@ -178,8 +178,9 @@
           </div>
 
           <div class="form-group" style="margin-bottom: 1.5rem;">
-            <label>URL de la Imagen</label>
-            <input v-model="form.imagen" type="text" class="form-input" placeholder="https://ejemplo.com/imagen.jpg">
+            <label>Imagen del Producto</label>
+            <input @change="handleImageUpload" type="file" accept="image/*" class="form-input" style="padding: 0.5rem;">
+            <p v-if="form.imagen" style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--color-text-light);">Imagen actual: {{ form.imagen }}</p>
           </div>
 
           <div style="display: flex; gap: 1rem; justify-content: flex-end;">
@@ -313,6 +314,8 @@ const form = ref({
   imagen: ''
 });
 
+const imagenFile = ref(null);
+
 const cargarProductos = async () => {
   const token = localStorage.getItem('token');
   try {
@@ -365,6 +368,14 @@ const abrirModalEditar = (producto) => {
 
 const cerrarModal = () => {
   modalAbierto.value = false;
+  imagenFile.value = null;
+};
+
+const handleImageUpload = (event) => {
+  const file = event.target.files[0];
+  if (file) {
+    imagenFile.value = file;
+  }
 };
 
 const guardar = async () => {
@@ -372,17 +383,41 @@ const guardar = async () => {
   const url = editando.value ? `/api/productos/${form.value.id}` : '/api/productos';
   const method = editando.value ? 'PUT' : 'POST';
 
-  // Mapear los campos del frontend a los nombres esperados por el backend
-  const payload = {
-    nombre: form.value.nombre,
-    descripcion: form.value.descripcion,
-    stock_actual: form.value.stock,
-    precio_unitario: form.value.precio,
-    imagen_url: form.value.imagen,
-    categoria_id: form.value.categoria_id
-  };
-
   try {
+    let imagenUrl = form.value.imagen;
+
+    // Si hay una nueva imagen, subirla primero
+    if (imagenFile.value) {
+      const formData = new FormData();
+      formData.append('imagen', imagenFile.value);
+
+      const uploadResponse = await fetch(getAppUrl('/api/upload-imagen'), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (uploadResponse.ok) {
+        const uploadData = await uploadResponse.json();
+        imagenUrl = uploadData.url;
+      } else {
+        alert('Error al subir la imagen');
+        return;
+      }
+    }
+
+    // Mapear los campos del frontend a los nombres esperados por el backend
+    const payload = {
+      nombre: form.value.nombre,
+      descripcion: form.value.descripcion,
+      stock_actual: form.value.stock,
+      precio_unitario: form.value.precio,
+      imagen_url: imagenUrl,
+      categoria_id: form.value.categoria_id
+    };
+
     const response = await apiFetch(url, {
       method,
       body: JSON.stringify(payload)

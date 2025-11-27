@@ -280,6 +280,9 @@ const generarQR = async () => {
 
     // Obtener cotizacion_id si existe
     const cotizacionId = localStorage.getItem('cotizacion_id');
+    
+    // Obtener venta_pendiente_id si existe (pago de compra pendiente)
+    const ventaPendienteId = localStorage.getItem('venta_pendiente_id');
 
     const payload = {
       cliente_id: usuario.value.id,
@@ -289,7 +292,8 @@ const generarQR = async () => {
       cliente_ci: usuario.value.ci,
       cliente_telefono: usuario.value.telefono,
       cliente_email: usuario.value.correo,
-      cotizacion_id: cotizacionId ? parseInt(cotizacionId) : null
+      cotizacion_id: cotizacionId ? parseInt(cotizacionId) : null,
+      venta_id: ventaPendienteId ? parseInt(ventaPendienteId) : null
     };
 
     const response = await apiFetch('/api/generar-qr', {
@@ -303,9 +307,10 @@ const generarQR = async () => {
       pagoInfo.value = data;
       estadoPago.value = 'pendiente';
       
-      // Limpiar carrito y cotizacion_id después de generar QR
+      // Limpiar carrito, cotizacion_id y venta_pendiente_id después de generar QR
       localStorage.removeItem('carrito');
       localStorage.removeItem('cotizacion_id');
+      localStorage.removeItem('venta_pendiente_id');
       
       // Iniciar verificación automática cada 5 segundos
       intervalVerificacion.value = setInterval(verificarEstado, 5000);

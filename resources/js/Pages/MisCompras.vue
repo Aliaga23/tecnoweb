@@ -465,7 +465,10 @@ const pagarCompra = async (compra) => {
     // Guardar en localStorage
     localStorage.setItem('carrito', JSON.stringify(productosCarrito));
     
-    // Redirigir a página de pago QR (flujo normal, creará una nueva venta)
+    // Guardar venta_id para actualizar en lugar de crear nueva
+    localStorage.setItem('venta_pendiente_id', compra.id);
+    
+    // Redirigir a página de pago QR
     window.location.href = getAppUrl('/pago-qr');
   } catch (error) {
     console.error('Error al procesar pago:', error);

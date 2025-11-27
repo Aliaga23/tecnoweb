@@ -268,14 +268,15 @@ const generarQRCredito = async () => {
       },
       body: JSON.stringify({
         venta_id: venta_id,
-        monto: parseFloat(monto),
-        cliente_id: usuario.value.id,
-        cliente_nombre: `${usuario.value.nombre} ${usuario.value.apellido || ''}`.trim(),
-        cliente_ci: usuario.value.ci || '',
-        cliente_telefono: usuario.value.telefono || '',
-        cliente_email: usuario.value.correo || ''
+        monto: parseFloat(monto)
       })
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error response:', errorText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
     const data = await response.json();
 
@@ -299,7 +300,12 @@ const generarQRCredito = async () => {
     }
   } catch (error) {
     console.error('Error al generar QR:', error);
-    mensajeError.value = 'Error de conexión al generar el código QR';
+    // Mostrar mensaje de error más detallado
+    if (error.message) {
+      mensajeError.value = error.message;
+    } else {
+      mensajeError.value = 'Error de conexión al generar el código QR. Por favor verifica tu información.';
+    }
     estadoPago.value = 'error';
   }
 };

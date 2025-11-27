@@ -161,7 +161,8 @@ class PagoController extends Controller
                 'cliente_nombre' => 'required|string',
                 'cliente_ci' => 'required|string',
                 'cliente_telefono' => 'required|string',
-                'cliente_email' => 'required|email'
+                'cliente_email' => 'required|email',
+                'venta_id' => 'nullable|integer'
             ]);
 
             $accessToken = $this->getAccessToken();
@@ -232,12 +233,27 @@ class PagoController extends Controller
                     ], 400);
                 }
                 
-                // Obtener cotizacion_id si existe
+                // Obtener cotizacion_id y venta_id si existen
                 $cotizacionId = $request->input('cotizacion_id');
+                $ventaIdExistente = $request->input('venta_id');
                 
-                $resultado = Pago::crearVentaConDetalles($clienteId, $productos, $total, $cotizacionId);
-                $ventaId = $resultado['venta_id'];
-                $pagoId = $resultado['pago_id'];
+                // Si hay venta_id existente (pago pendiente), crear solo el pago
+                if ($ventaIdExistente) {
+                    // Crear el registro de pago para la venta existente
+                    $pagoId = DB::selectOne(
+                        "INSERT INTO pago (monto, metodo, fecha_pago, venta_id)
+                        VALUES (?, 'qr', NOW(), ?)
+                        RETURNING id",
+                        [$total, $ventaIdExistente]
+                    )->id;
+                    
+                    $ventaId = $ventaIdExistente;
+                } else {
+                    // Crear nueva venta con detalles
+                    $resultado = Pago::crearVentaConDetalles($clienteId, $productos, $total, $cotizacionId);
+                    $ventaId = $resultado['venta_id'];
+                    $pagoId = $resultado['pago_id'];
+                }
 
                 $qrImage = $pagoFacilResponse['values']['qrBase64'] ?? null;
                 $transactionId = $pagoFacilResponse['values']['transactionId'] ?? null;
@@ -358,26 +374,20 @@ class PagoController extends Controller
     public function generarQRCredito(Request $request)
     {
         try {
-            $request->validate([
+            $validated = $request->validate([
                 'venta_id' => 'required|integer',
-                'monto' => 'required|numeric|min:0.01',
-                'cliente_id' => 'required|integer',
-                'cliente_nombre' => 'required|string',
-                'cliente_ci' => 'required|string',
-                'cliente_telefono' => 'required|string',
-                'cliente_email' => 'required|email'
+                'monto' => 'required|numeric|min:0.01'
             ]);
 
-            // Verificar que la venta existe y pertenece al cliente
+            // Verificar que la venta existe
             $venta = DB::table('venta')
                 ->where('id', $request->venta_id)
-                ->where('cliente_id', $request->cliente_id)
                 ->first();
 
             if (!$venta) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Venta no encontrada o no autorizada'
+                    'error' => 'Venta no encontrada'
                 ], 404);
             }
 
@@ -401,11 +411,11 @@ class PagoController extends Controller
 
             $payload = [
                 'paymentMethod' => $paymentMethodId,
-                'clientName' => $request->cliente_nombre,
+                'clientName' => 'Cliente',
                 'documentType' => 1,
-                'documentId' => preg_replace('/[^0-9]/', '', $request->cliente_ci),
-                'phoneNumber' => preg_replace('/[^0-9]/', '', $request->cliente_telefono),
-                'email' => $request->cliente_email,
+                'documentId' => '0',
+                'phoneNumber' => '00000000',
+                'email' => 'cliente@ejemplo.com',
                 'paymentNumber' => $paymentNumber,
                 'amount' => 0.1, // Monto mínimo para testing
                 'currency' => 2,
