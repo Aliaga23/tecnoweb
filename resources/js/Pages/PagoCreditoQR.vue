@@ -133,21 +133,9 @@
             </div>
 
             <!-- Estado de verificación -->
-            <div v-if="verificandoPago" style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #ffc107;">
-              <div style="display: flex; align-items: center; justify-content: center;">
-                <div class="loading-small" style="margin-right: 0.5rem;"></div>
-                <span>Verificando pago...</span>
-              </div>
-            </div>
-
-            <!-- Botones -->
-            <div style="display: flex; gap: 1rem; justify-content: center;">
-              <button @click="verificarPagoManual" class="btn btn-primary" :disabled="verificandoPago">
-                Verificar Pago
-              </button>
-              <button @click="cancelarPago" class="btn btn-secondary">
-                Cancelar
-              </button>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 0.75rem; color: var(--color-text-light); margin-bottom: 2rem;">
+              <div class="loading-small"></div>
+              <span>Esperando confirmación del pago...</span>
             </div>
           </div>
 
