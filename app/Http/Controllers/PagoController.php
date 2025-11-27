@@ -357,17 +357,29 @@ class PagoController extends Controller
             }
 
             $qrData = Cache::get('qr_' . $pagoId);
+            $qrDataCredito = Cache::get('qr_credito_' . $pagoId);
+            
+            // Si es pago a crédito, verificar confirmación desde el callback
+            $esPagoCredito = $qrDataCredito !== null;
+            $pagoConfirmado = false;
+            
+            if ($esPagoCredito) {
+                $pagoConfirmado = Cache::get('pago_confirmado_' . $pagoId);
+            }
 
             return response()->json([
+                'success' => true,
+                'pagado' => $esPagoCredito ? ($pagoConfirmado || false) : ($pago->venta_estado === 'pagada'),
                 'pago_id' => $pago->id,
                 'estado' => $pago->venta_estado,
                 'monto' => $pago->monto,
-                'payment_number' => $qrData['payment_number'] ?? 'N/A',
-                'transaction_id' => $qrData['transaction_id'] ?? 'N/A',
+                'payment_number' => ($qrData['payment_number'] ?? $qrDataCredito['payment_number'] ?? 'N/A'),
+                'transaction_id' => ($qrData['transaction_id'] ?? $qrDataCredito['transaction_id'] ?? 'N/A'),
                 'fecha_pago' => $pago->fecha_pago
             ]);
 
         } catch (\Exception $e) {
+            \Log::error('Error en consultarEstado: ' . $e->getMessage());
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
@@ -524,7 +536,12 @@ class PagoController extends Controller
                 
                 if ($paymentData) {
                     if ($estado == 2) {
-                        // Pago confirmado - verificar si se completó el total
+                        // Marcar el pago específico actualizando su fecha
+                        DB::table('pago')
+                            ->where('id', $paymentData['pago_id'])
+                            ->update(['fecha_pago' => now()]);
+                        
+                        // Verificar si se completó el total de la venta
                         $venta = DB::table('venta')->where('id', $paymentData['venta_id'])->first();
                         $totalPagado = DB::table('pago')
                             ->where('venta_id', $paymentData['venta_id'])
@@ -535,6 +552,9 @@ class PagoController extends Controller
                                 ->where('id', $paymentData['venta_id'])
                                 ->update(['estado' => 'pagada']);
                         }
+                        
+                        // Guardar confirmación en caché para verificación rápida
+                        Cache::put('pago_confirmado_' . $paymentData['pago_id'], true, now()->addHours(24));
                         
                         \Log::info('Pago a crédito completado:', [
                             'venta_id' => $paymentData['venta_id'],
