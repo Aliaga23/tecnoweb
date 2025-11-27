@@ -529,12 +529,18 @@ class PagoController extends Controller
                 'venta_id' => 'required|integer'
             ]);
 
-            // Obtener información de la venta
+            // Obtener información completa de la venta y cliente
             $venta = DB::table('venta')
                 ->join('usuario as cliente', 'venta.cliente_id', '=', 'cliente.id')
                 ->where('venta.id', $request->venta_id)
-                ->select('venta.*', 'cliente.nombre as cliente_nombre', 'cliente.ci as cliente_ci', 
-                         'cliente.telefono as cliente_telefono', 'cliente.email as cliente_email')
+                ->select(
+                    'venta.*', 
+                    'cliente.nombre', 
+                    'cliente.apellido', 
+                    'cliente.ci', 
+                    'cliente.telefono', 
+                    'cliente.correo'
+                )
                 ->first();
 
             if (!$venta) {
@@ -556,8 +562,14 @@ class PagoController extends Controller
 
             $monto = $venta->total;
             $paymentNumber = 'MPCONT' . time() . $request->venta_id;
+            
+            // Construir nombre completo del cliente
+            $clienteNombreCompleto = trim(($venta->nombre ?? '') . ' ' . ($venta->apellido ?? ''));
+            if (empty($clienteNombreCompleto)) {
+                $clienteNombreCompleto = 'Cliente';
+            }
 
-            // Crear detalle del pago
+            // Crear detalle del pago con los productos reales
             $orderDetail = [];
             foreach ($productos as $index => $producto) {
                 $orderDetail[] = [
@@ -572,11 +584,11 @@ class PagoController extends Controller
 
             $payload = [
                 'paymentMethod' => $paymentMethodId,
-                'clientName' => $venta->cliente_nombre ?? 'Cliente',
+                'clientName' => $clienteNombreCompleto,
                 'documentType' => 1,
-                'documentId' => preg_replace('/[^0-9]/', '', $venta->cliente_ci ?? '0'),
-                'phoneNumber' => preg_replace('/[^0-9]/', '', $venta->cliente_telefono ?? '00000000'),
-                'email' => $venta->cliente_email ?? 'cliente@ejemplo.com',
+                'documentId' => preg_replace('/[^0-9]/', '', $venta->ci ?? '0'),
+                'phoneNumber' => preg_replace('/[^0-9]/', '', $venta->telefono ?? '00000000'),
+                'email' => $venta->correo ?? 'cliente@ejemplo.com',
                 'paymentNumber' => $paymentNumber,
                 'amount' => 0.1, // Monto mínimo para testing
                 'currency' => 2,
@@ -598,6 +610,7 @@ class PagoController extends Controller
             \Log::info('PagoFácil Generate QR Venta Contado Request:', [
                 'venta_id' => $request->venta_id,
                 'monto' => $monto,
+                'cliente' => $clienteNombreCompleto,
                 'payload' => $payload
             ]);
 
@@ -619,12 +632,13 @@ class PagoController extends Controller
                 // Obtener el pago existente de la venta
                 $pago = DB::table('pago')
                     ->where('venta_id', $request->venta_id)
+                    ->where('metodo', 'qr')
                     ->first();
 
                 if (!$pago) {
                     return response()->json([
                         'success' => false,
-                        'error' => 'Pago no encontrado para esta venta'
+                        'error' => 'Pago QR no encontrado para esta venta'
                     ], 404);
                 }
 
