@@ -65,6 +65,7 @@
               <a :href="getAppUrl('/dashboard/categorias')" class="dropdown-item">Categorías</a>
               <a :href="getAppUrl('/dashboard/transacciones')" class="dropdown-item">Transacciones</a>
               <a :href="getAppUrl('/dashboard/ventas-credito')" class="dropdown-item">Ventas al Crédito</a>
+              <a :href="getAppUrl('/dashboard/ventas-contado')" class="dropdown-item">Ventas al Contado</a>
             </div>
           </li>
           
