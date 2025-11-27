@@ -115,7 +115,7 @@
               <div style="display: grid; gap: 1rem; margin-bottom: 1.5rem;">
                 <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: var(--color-bg-alt); border-radius: 8px;">
                   <span style="font-weight: 600; color: var(--color-text);">Categoría:</span>
-                  <span style="color: var(--color-text);">{{ producto.categoria?.nombre || 'Sin categoría' }}</span>
+                  <span style="color: var(--color-text);">{{ categoria.nombre || 'Sin categoría' }}</span>
                 </div>
                 
                 <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: var(--color-bg-alt); border-radius: 8px;">
