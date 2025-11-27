@@ -43,6 +43,10 @@ Route::get('/dashboard/ventas-credito', function () {
     return Inertia::render('DashboardVentasCredito');
 });
 
+Route::get('/dashboard/ventas-contado', function () {
+    return Inertia::render('DashboardVentasContado');
+});
+
 Route::get('/dashboard/cotizaciones', function () {
     return Inertia::render('DashboardCotizaciones');
 });

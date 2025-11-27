@@ -277,4 +277,141 @@ class Transaccion extends Model
 
         return $ventas;
     }
+
+    // Métodos para Ventas al Contado
+    public static function crearVentaContado($cliente_id, $productos, $metodo_pago, $vendedor_id = null)
+    {
+        return DB::transaction(function() use ($cliente_id, $productos, $metodo_pago, $vendedor_id) {
+            // Calcular total
+            $total = array_reduce($productos, function($carry, $item) {
+                return $carry + ($item['cantidad'] * $item['precio_unitario']);
+            }, 0);
+
+            // Crear venta
+            $venta_id = DB::table('venta')->insertGetId([
+                'fecha_venta' => now(),
+                'tipo' => 'contado',
+                'total' => $total,
+                'estado' => 'pagada',  // Al contado se paga inmediatamente
+                'cliente_id' => $cliente_id,
+                'vendedor_id' => $vendedor_id,
+                'cotizacion_id' => null
+            ]);
+
+            // Insertar detalles y actualizar stock
+            foreach ($productos as $producto) {
+                DB::table('detalle_venta')->insert([
+                    'venta_id' => $venta_id,
+                    'producto_id' => $producto['producto_id'],
+                    'cantidad' => $producto['cantidad'],
+                    'precio_unitario' => $producto['precio_unitario'],
+                    'subtotal' => $producto['cantidad'] * $producto['precio_unitario']
+                ]);
+
+                // Actualizar stock
+                DB::table('producto')
+                    ->where('id', $producto['producto_id'])
+                    ->decrement('stock_actual', $producto['cantidad']);
+            }
+
+            // Registrar pago completo
+            DB::table('pago')->insert([
+                'venta_id' => $venta_id,
+                'monto' => $total,
+                'metodo' => $metodo_pago,
+                'fecha_pago' => now()
+            ]);
+
+            return self::obtenerDetalleVenta($venta_id);
+        });
+    }
+
+    public static function registrarPagoContado($venta_id, $monto, $metodo)
+    {
+        return DB::transaction(function() use ($venta_id, $monto, $metodo) {
+            // Obtener venta
+            $venta = DB::table('venta')->where('id', $venta_id)->first();
+            
+            if (!$venta) {
+                throw new \Exception('Venta no encontrada');
+            }
+
+            if ($venta->tipo !== 'contado') {
+                throw new \Exception('Esta venta no es al contado');
+            }
+
+            // Calcular total pagado
+            $total_pagado = DB::table('pago')
+                ->where('venta_id', $venta_id)
+                ->sum('monto');
+
+            $nuevo_total = $total_pagado + $monto;
+
+            if ($nuevo_total > $venta->total) {
+                throw new \Exception('El monto excede la deuda pendiente');
+            }
+
+            // Registrar pago
+            $pago_id = DB::table('pago')->insertGetId([
+                'venta_id' => $venta_id,
+                'monto' => $monto,
+                'metodo' => $metodo,
+                'fecha_pago' => now()
+            ]);
+
+            // Actualizar estado de venta si está totalmente pagada
+            if ($nuevo_total >= $venta->total) {
+                DB::table('venta')
+                    ->where('id', $venta_id)
+                    ->update(['estado' => 'pagada']);
+            }
+
+            $pago = DB::table('pago')->where('id', $pago_id)->first();
+            
+            return [
+                'pago' => $pago,
+                'mensaje' => $nuevo_total >= $venta->total 
+                    ? 'Venta pagada completamente' 
+                    : 'Pago registrado exitosamente'
+            ];
+        });
+    }
+
+    public static function obtenerVentasContado()
+    {
+        $ventas = DB::select(
+            "SELECT 
+                v.id,
+                v.fecha_venta,
+                v.total,
+                v.estado,
+                v.cliente_id,
+                u.nombre || ' ' || u.apellido as cliente_nombre,
+                COALESCE(SUM(p.monto), 0) as monto_pagado,
+                v.total - COALESCE(SUM(p.monto), 0) as saldo_pendiente
+            FROM venta v
+            LEFT JOIN usuario u ON v.cliente_id = u.id
+            LEFT JOIN pago p ON v.id = p.venta_id
+            WHERE v.tipo = 'contado'
+            GROUP BY v.id, v.fecha_venta, v.total, v.estado, v.cliente_id, u.nombre, u.apellido
+            ORDER BY v.fecha_venta DESC"
+        );
+
+        // Obtener pagos para cada venta
+        foreach ($ventas as $venta) {
+            $venta->pagos = DB::select(
+                "SELECT 
+                    id,
+                    monto,
+                    metodo,
+                    fecha_pago
+                FROM pago
+                WHERE venta_id = ?
+                ORDER BY fecha_pago DESC",
+                [$venta->id]
+            );
+        }
+
+        return $ventas;
+    }
 }

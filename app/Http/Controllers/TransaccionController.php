@@ -214,4 +214,105 @@ class TransaccionController extends Controller
             ], 500);
         }
     }
+
+    // Métodos para Ventas al Contado
+    public function crearVentaContado(Request $request)
+    {
+        $request->validate([
+            'cliente_id' => 'required|exists:usuario,id',
+            'productos' => 'required|array|min:1',
+            'productos.*.producto_id' => 'required|exists:producto,id',
+            'productos.*.cantidad' => 'required|integer|min:1',
+            'productos.*.precio_unitario' => 'required|numeric|min:0',
+            'metodo_pago' => 'required|string|in:efectivo,qr,tarjeta'
+        ]);
+
+        try {
+            $venta = Transaccion::crearVentaContado(
+                $request->cliente_id,
+                $request->productos,
+                $request->metodo_pago,
+                auth()->id()
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Venta al contado creada exitosamente',
+                'data' => $venta
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al crear venta al contado: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function registrarPagoContado(Request $request, $id)
+    {
+        $request->validate([
+            'monto' => 'required|numeric|min:0',
+            'metodo' => 'required|string|in:efectivo,qr,tarjeta'
+        ]);
+
+        try {
+            // Verificar que sea el cliente de la venta o un admin/vendedor
+            $venta = DB::table('venta')->where('id', $id)->first();
+            
+            if (!$venta) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Venta no encontrada'
+                ], 404);
+            }
+
+            $usuario = auth()->user();
+            $es_cliente = $venta->cliente_id == $usuario->id;
+            $es_admin = in_array($usuario->rol_id, [1, 2]); // Propietario o Vendedor
+
+            if (!$es_cliente && !$es_admin) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No tienes permisos para registrar pagos de esta venta'
+                ], 403);
+            }
+
+            $resultado = Transaccion::registrarPagoContado(
+                $id,
+                $request->monto,
+                $request->metodo
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => $resultado['mensaje'],
+                'data' => $resultado['pago']
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al registrar pago: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function obtenerVentasContado()
+    {
+        try {
+            $ventas = Transaccion::obtenerVentasContado();
+
+            return response()->json([
+                'success' => true,
+                'data' => $ventas
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener ventas al contado: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

@@ -39,6 +39,7 @@ Route::get('/catalogo-categorias', [CatalogoController::class, 'categorias'])->n
 
 // Pagos QR PagoFácil
 Route::post('/generar-qr', [PagoController::class, 'generarQR']);
+Route::post('/generar-qr-venta-contado', [PagoController::class, 'generarQRVentaContado']);
 Route::post('/pago-callback', [PagoController::class, 'callback']);
 Route::post('/pago-credito-callback', [PagoController::class, 'callbackCredito']);
 Route::get('/pago-estado/{pago_id}', [PagoController::class, 'consultarEstado']);
@@ -118,6 +119,11 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/ventas/credito', [TransaccionController::class, 'crearVentaCredito']);
         Route::get('/ventas/credito', [TransaccionController::class, 'obtenerVentasCredito']);
         Route::post('/ventas/{id}/pagos', [TransaccionController::class, 'registrarPagoCredito']);
+        
+        // Ventas al Contado (Propietario y Vendedor)
+        Route::post('/ventas/contado', [TransaccionController::class, 'crearVentaContado']);
+        Route::get('/ventas/contado', [TransaccionController::class, 'obtenerVentasContado']);
+        Route::post('/ventas/{id}/pago-contado', [TransaccionController::class, 'registrarPagoContado']);
         
         // Gestión de Ventas (solo lectura para Propietario y Vendedor)
         Route::get('/ventas', [CompraController::class, 'indexVentas']);

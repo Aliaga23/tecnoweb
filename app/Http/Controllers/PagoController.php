@@ -522,6 +522,158 @@ class PagoController extends Controller
         }
     }
 
+    public function generarQRVentaContado(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'venta_id' => 'required|integer'
+            ]);
+
+            // Obtener información de la venta
+            $venta = DB::table('venta')
+                ->join('usuario as cliente', 'venta.cliente_id', '=', 'cliente.id')
+                ->where('venta.id', $request->venta_id)
+                ->select('venta.*', 'cliente.nombre as cliente_nombre', 'cliente.ci as cliente_ci', 
+                         'cliente.telefono as cliente_telefono', 'cliente.email as cliente_email')
+                ->first();
+
+            if (!$venta) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Venta no encontrada'
+                ], 404);
+            }
+
+            // Obtener productos de la venta
+            $productos = DB::table('detalle_venta')
+                ->join('producto', 'detalle_venta.producto_id', '=', 'producto.id')
+                ->where('detalle_venta.venta_id', $request->venta_id)
+                ->select('producto.nombre', 'detalle_venta.cantidad', 'detalle_venta.precio_unitario')
+                ->get();
+
+            $accessToken = $this->getAccessToken();
+            $paymentMethodId = $this->getPaymentMethodId($accessToken);
+
+            $monto = $venta->total;
+            $paymentNumber = 'MPCONT' . time() . $request->venta_id;
+
+            // Crear detalle del pago
+            $orderDetail = [];
+            foreach ($productos as $index => $producto) {
+                $orderDetail[] = [
+                    'serial' => $index + 1,
+                    'product' => $producto->nombre,
+                    'quantity' => (int)$producto->cantidad,
+                    'price' => (float)$producto->precio_unitario,
+                    'discount' => 0,
+                    'total' => (float)($producto->cantidad * $producto->precio_unitario)
+                ];
+            }
+
+            $payload = [
+                'paymentMethod' => $paymentMethodId,
+                'clientName' => $venta->cliente_nombre ?? 'Cliente',
+                'documentType' => 1,
+                'documentId' => preg_replace('/[^0-9]/', '', $venta->cliente_ci ?? '0'),
+                'phoneNumber' => preg_replace('/[^0-9]/', '', $venta->cliente_telefono ?? '00000000'),
+                'email' => $venta->cliente_email ?? 'cliente@ejemplo.com',
+                'paymentNumber' => $paymentNumber,
+                'amount' => 0.1, // Monto mínimo para testing
+                'currency' => 2,
+                'clientCode' => $this->tokenSecret,
+                'callbackUrl' => url('/api/pago-credito-callback'),
+                'orderDetail' => $orderDetail
+            ];
+
+            $headers = [
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . $accessToken
+            ];
+
+            $response = Http::withHeaders($headers)
+                ->timeout(30)
+                ->post($this->apiUrl . '/generate-qr', $payload);
+
+            \Log::info('PagoFácil Generate QR Venta Contado Request:', [
+                'venta_id' => $request->venta_id,
+                'monto' => $monto,
+                'payload' => $payload
+            ]);
+
+            \Log::info('PagoFácil Generate QR Venta Contado Response:', [
+                'status' => $response->status(),
+                'body' => $response->json()
+            ]);
+
+            if ($response->successful()) {
+                $pagoFacilResponse = $response->json();
+                
+                if (isset($pagoFacilResponse['error']) && $pagoFacilResponse['error'] != 0) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Error de PagoFácil: ' . ($pagoFacilResponse['message'] ?? 'Error desconocido')
+                    ], 400);
+                }
+                
+                // Obtener el pago existente de la venta
+                $pago = DB::table('pago')
+                    ->where('venta_id', $request->venta_id)
+                    ->first();
+
+                if (!$pago) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Pago no encontrado para esta venta'
+                    ], 404);
+                }
+
+                $qrImage = $pagoFacilResponse['values']['qrBase64'] ?? null;
+                $transactionId = $pagoFacilResponse['values']['transactionId'] ?? null;
+
+                if ($qrImage && !str_starts_with($qrImage, 'data:image')) {
+                    $qrImage = 'data:image/png;base64,' . $qrImage;
+                }
+                
+                // Guardar en caché
+                Cache::put('qr_venta_contado_' . $pago->id, [
+                    'payment_number' => $paymentNumber,
+                    'transaction_id' => $transactionId,
+                    'qr_image' => $qrImage,
+                    'venta_id' => $request->venta_id,
+                    'monto' => $monto
+                ], now()->addHours(2));
+                
+                Cache::put('payment_credito_' . $paymentNumber, [
+                    'pago_id' => $pago->id,
+                    'venta_id' => $request->venta_id
+                ], now()->addHours(2));
+
+                return response()->json([
+                    'success' => true,
+                    'pago_id' => $pago->id,
+                    'qr_image' => $qrImage,
+                    'transaction_id' => $transactionId,
+                    'payment_number' => $paymentNumber,
+                    'monto' => $monto
+                ]);
+
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Error al generar QR: ' . $response->body()
+                ], 500);
+            }
+
+        } catch (\Exception $e) {
+            \Log::error('Error en generarQRVentaContado: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Error interno: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function callbackCredito(Request $request)
     {
         try {
