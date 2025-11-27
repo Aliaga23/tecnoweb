@@ -22,8 +22,8 @@ class ImagenController extends Controller
                 // Guardar en public/images/productos
                 $imagen->move(public_path('images/productos'), $nombreArchivo);
                 
-                // Retornar URL completa usando el helper url()
-                $url = url('images/productos/' . $nombreArchivo);
+                // Retornar URL completa
+                $url = 'https://www.tecnoweb.org.bo/inf513/grupo01sc/tecnoweb/public/images/productos/' . $nombreArchivo;
 
                 return response()->json([
                     'success' => true,
