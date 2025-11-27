@@ -821,8 +821,7 @@ const abrirModalCrearVenta = async () => {
   productoSeleccionadoId.value = '';
   cantidadProducto.value = 1;
   productosVenta.value = [];
-  montoAdelanto.value = 0;
-  metodoAdelanto.value = '';
+  metodoPagoVenta.value = '';
   
   // Cargar productos disponibles
   await cargarProductos();
