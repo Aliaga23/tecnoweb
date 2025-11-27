@@ -266,6 +266,9 @@ const generarQR = async () => {
       return;
     }
 
+    // Verificar si es pago de venta pendiente
+    const ventaPendienteId = localStorage.getItem('venta_pendiente_id');
+
     // Obtener carrito actual
     const carritoActual = JSON.parse(localStorage.getItem('carrito') || '[]');
     if (carritoActual.length === 0) {
@@ -279,6 +282,46 @@ const generarQR = async () => {
       sum + (item.cantidad * item.costo_unitario), 0
     );
 
+    // Si es una venta pendiente de contado, usar endpoint de pago a crédito
+    if (ventaPendienteId) {
+      const payload = {
+        venta_id: parseInt(ventaPendienteId),
+        monto: totalCalculado,
+        cliente_id: usuario.value.id,
+        cliente_nombre: `${usuario.value.nombre} ${usuario.value.apellido || ''}`.trim(),
+        cliente_ci: usuario.value.ci || '',
+        cliente_telefono: usuario.value.telefono || '',
+        cliente_email: usuario.value.correo || ''
+      };
+
+      const response = await apiFetch('/api/generar-qr-credito', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        pagoInfo.value = {
+          ...data,
+          total: totalCalculado
+        };
+        estadoPago.value = 'pendiente';
+        
+        // Limpiar datos
+        localStorage.removeItem('carrito');
+        localStorage.removeItem('venta_pendiente_id');
+        
+        // Iniciar verificación automática cada 5 segundos
+        intervalVerificacion.value = setInterval(verificarEstado, 5000);
+      } else {
+        errorMessage.value = data.error || 'Error al generar QR';
+        estadoPago.value = 'error';
+      }
+      return;
+    }
+
+    // Flujo normal: crear nueva venta
     // Obtener cotizacion_id si existe
     const cotizacionId = localStorage.getItem('cotizacion_id');
 

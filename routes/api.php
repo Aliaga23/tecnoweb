@@ -39,7 +39,9 @@ Route::get('/catalogo-categorias', [CatalogoController::class, 'categorias'])->n
 // Pagos QR PagoFácil
 Route::post('/generar-qr', [PagoController::class, 'generarQR']);
 Route::post('/pago-callback', [PagoController::class, 'callback']);
+Route::post('/pago-credito-callback', [PagoController::class, 'callbackCredito']);
 Route::get('/pago-estado/{pago_id}', [PagoController::class, 'consultarEstado']);
+Route::get('/verificar-pago/{pago_id}', [PagoController::class, 'consultarEstado']);
 
 // Contador de visitas (público)
 Route::post('/visitas/{pagina}', function($pagina) {
@@ -167,4 +169,8 @@ Route::middleware('auth:api')->group(function () {
     // Ventas al Crédito del Cliente
     Route::get('/mis-ventas-credito', [TransaccionController::class, 'misVentasCredito']);
     Route::post('/ventas/{id}/pago-credito', [TransaccionController::class, 'registrarPagoCredito']);
+    
+    // Pago QR para crédito
+    Route::post('/generar-qr-credito', [PagoController::class, 'generarQRCredito']);
 });
+

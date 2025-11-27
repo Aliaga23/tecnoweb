@@ -354,4 +354,200 @@ class PagoController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+
+    public function generarQRCredito(Request $request)
+    {
+        try {
+            $request->validate([
+                'venta_id' => 'required|integer',
+                'monto' => 'required|numeric|min:0.01',
+                'cliente_id' => 'required|integer',
+                'cliente_nombre' => 'required|string',
+                'cliente_ci' => 'required|string',
+                'cliente_telefono' => 'required|string',
+                'cliente_email' => 'required|email'
+            ]);
+
+            // Verificar que la venta existe y pertenece al cliente
+            $venta = DB::table('venta')
+                ->where('id', $request->venta_id)
+                ->where('cliente_id', $request->cliente_id)
+                ->first();
+
+            if (!$venta) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Venta no encontrada o no autorizada'
+                ], 404);
+            }
+
+            $accessToken = $this->getAccessToken();
+            $paymentMethodId = $this->getPaymentMethodId($accessToken);
+
+            $monto = $request->monto;
+            $paymentNumber = 'MPCRED' . time() . $request->venta_id;
+
+            // Crear detalle del pago a crédito
+            $orderDetail = [
+                [
+                    'serial' => 1,
+                    'product' => 'Pago a crédito - Venta #' . $request->venta_id,
+                    'quantity' => 1,
+                    'price' => (float)$monto,
+                    'discount' => 0,
+                    'total' => (float)$monto
+                ]
+            ];
+
+            $payload = [
+                'paymentMethod' => $paymentMethodId,
+                'clientName' => $request->cliente_nombre,
+                'documentType' => 1,
+                'documentId' => preg_replace('/[^0-9]/', '', $request->cliente_ci),
+                'phoneNumber' => preg_replace('/[^0-9]/', '', $request->cliente_telefono),
+                'email' => $request->cliente_email,
+                'paymentNumber' => $paymentNumber,
+                'amount' => 0.1, // Monto mínimo para testing
+                'currency' => 2,
+                'clientCode' => $this->tokenSecret,
+                'callbackUrl' => url('/api/pago-credito-callback'),
+                'orderDetail' => $orderDetail
+            ];
+
+            $headers = [
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . $accessToken
+            ];
+
+            $response = Http::withHeaders($headers)
+                ->timeout(30)
+                ->post($this->apiUrl . '/generate-qr', $payload);
+
+            \Log::info('PagoFácil Generate QR Crédito Request:', [
+                'venta_id' => $request->venta_id,
+                'monto' => $monto,
+                'payload' => $payload
+            ]);
+
+            \Log::info('PagoFácil Generate QR Crédito Response:', [
+                'status' => $response->status(),
+                'body' => $response->json()
+            ]);
+
+            if ($response->successful()) {
+                $pagoFacilResponse = $response->json();
+                
+                if (isset($pagoFacilResponse['error']) && $pagoFacilResponse['error'] != 0) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Error de PagoFácil: ' . ($pagoFacilResponse['message'] ?? 'Error desconocido')
+                    ], 400);
+                }
+                
+                // Crear registro de pago pendiente
+                $pagoId = DB::selectOne(
+                    "INSERT INTO pago (monto, metodo, fecha_pago, venta_id)
+                    VALUES (?, 'qr', NOW(), ?)
+                    RETURNING id",
+                    [$monto, $request->venta_id]
+                )->id;
+
+                $qrImage = $pagoFacilResponse['values']['qrBase64'] ?? null;
+                $transactionId = $pagoFacilResponse['values']['transactionId'] ?? null;
+
+                if ($qrImage && !str_starts_with($qrImage, 'data:image')) {
+                    $qrImage = 'data:image/png;base64,' . $qrImage;
+                }
+                
+                // Guardar en caché
+                Cache::put('qr_credito_' . $pagoId, [
+                    'payment_number' => $paymentNumber,
+                    'transaction_id' => $transactionId,
+                    'qr_image' => $qrImage,
+                    'venta_id' => $request->venta_id,
+                    'monto' => $monto
+                ], now()->addHours(2));
+                
+                Cache::put('payment_credito_' . $paymentNumber, [
+                    'pago_id' => $pagoId,
+                    'venta_id' => $request->venta_id
+                ], now()->addHours(2));
+
+                return response()->json([
+                    'success' => true,
+                    'pago_id' => $pagoId,
+                    'qr_image' => $qrImage,
+                    'transaction_id' => $transactionId,
+                    'payment_number' => $paymentNumber,
+                    'monto' => $monto
+                ]);
+
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Error al generar QR: ' . $response->body()
+                ], 500);
+            }
+
+        } catch (\Exception $e) {
+            \Log::error('Error en generarQRCredito: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Error interno: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function callbackCredito(Request $request)
+    {
+        try {
+            $data = $request->all();
+            \Log::info('PagoFácil Callback Crédito:', $data);
+
+            $pedidoId = $data['PedidoID'] ?? null;
+            $estado = $data['Estado'] ?? null;
+
+            if ($pedidoId) {
+                $paymentData = Cache::get('payment_credito_' . $pedidoId);
+                
+                if ($paymentData) {
+                    if ($estado == 2) {
+                        // Pago confirmado - verificar si se completó el total
+                        $venta = DB::table('venta')->where('id', $paymentData['venta_id'])->first();
+                        $totalPagado = DB::table('pago')
+                            ->where('venta_id', $paymentData['venta_id'])
+                            ->sum('monto');
+                        
+                        if ($totalPagado >= $venta->total) {
+                            DB::table('venta')
+                                ->where('id', $paymentData['venta_id'])
+                                ->update(['estado' => 'pagada']);
+                        }
+                        
+                        \Log::info('Pago a crédito completado:', [
+                            'venta_id' => $paymentData['venta_id'],
+                            'pago_id' => $paymentData['pago_id']
+                        ]);
+                    }
+                }
+            }
+
+            return response()->json([
+                'error' => 0,
+                'status' => 1,
+                'message' => 'Notificación recibida correctamente',
+                'values' => true
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::error('Error en callback crédito: ' . $e->getMessage());
+            return response()->json([
+                'error' => 1,
+                'status' => 0,
+                'message' => 'Error procesando callback',
+                'values' => false
+            ], 500);
+        }
+    }
 }

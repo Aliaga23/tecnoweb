@@ -61,7 +61,7 @@ class Venta extends Model
             [$usuarioId]
         );
 
-        // Para cada venta, obtener detalles y pago
+        // Para cada venta, obtener detalles y pagos
         foreach ($ventas as $venta) {
             // Obtener detalles de productos
             $venta->detalles = DB::select(
@@ -86,8 +86,8 @@ class Venta extends Model
                 ];
             }
 
-            // Obtener información de pago (solo campos que existen: monto, metodo, fecha_pago, venta_id)
-            $venta->pago = DB::selectOne(
+            // Obtener TODOS los pagos (importante para crédito)
+            $venta->pagos = DB::select(
                 "SELECT 
                     id,
                     monto,
@@ -96,9 +96,12 @@ class Venta extends Model
                     venta_id
                 FROM pago
                 WHERE venta_id = ?
-                LIMIT 1",
+                ORDER BY fecha_pago DESC",
                 [$venta->id]
             );
+
+            // Mantener compatibilidad: pago único (el más reciente)
+            $venta->pago = !empty($venta->pagos) ? $venta->pagos[0] : null;
         }
 
         return $ventas;

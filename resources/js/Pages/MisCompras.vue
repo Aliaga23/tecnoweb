@@ -102,10 +102,15 @@
 
         <!-- Filtros -->
         <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+          <select v-model="filtroTipo" class="form-input" style="width: auto; min-width: 200px;">
+            <option value="">Todos los tipos</option>
+            <option value="contado">Contado</option>
+            <option value="credito">Crédito</option>
+          </select>
           <select v-model="filtroEstado" class="form-input" style="width: auto; min-width: 200px;">
             <option value="">Todos los estados</option>
-            <option value="pendiente">Pendientes</option>
-            <option value="pagada">Pagadas</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="pagada">Pagada</option>
           </select>
         </div>
 
@@ -169,11 +174,33 @@
             </div>
 
             <!-- Información del pago -->
-            <div v-if="compra.pago" style="padding: 1rem; background: var(--color-bg); border-radius: 8px; border: 1px solid var(--color-border); margin-bottom: 1rem;">
+            <div v-if="compra.pago || (compra.pagos && compra.pagos.length > 0)" style="padding: 1rem; background: var(--color-bg); border-radius: 8px; border: 1px solid var(--color-border); margin-bottom: 1rem;">
               <h4 style="font-size: 1rem; color: var(--color-text); margin: 0 0 0.75rem 0; font-weight: 600;">
-                Información del pago:
+                {{ compra.tipo === 'credito' ? 'Historial de pagos:' : 'Información del pago:' }}
               </h4>
-              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
+              
+              <!-- Si es crédito, mostrar todos los pagos -->
+              <div v-if="compra.tipo === 'credito' && compra.pagos && compra.pagos.length > 0">
+                <div v-for="pago in compra.pagos" :key="pago.id" style="padding: 0.75rem; background: var(--color-bg-alt); border-radius: 6px; margin-bottom: 0.5rem; border: 1px solid var(--color-border);">
+                  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                    <p style="margin: 0; color: var(--color-text); font-size: 0.9rem;">
+                      <strong>Monto:</strong> Bs. {{ parseFloat(pago.monto).toFixed(2) }}
+                    </p>
+                    <p style="margin: 0; color: var(--color-text); font-size: 0.9rem;">
+                      <strong>Método:</strong> {{ pago.metodo.toUpperCase() }}
+                    </p>
+                    <p style="margin: 0; color: var(--color-text); font-size: 0.9rem;">
+                      <strong>Fecha:</strong> {{ formatearFecha(pago.fecha_pago) }}
+                    </p>
+                  </div>
+                </div>
+                <div style="padding: 0.75rem; background: var(--color-primary); color: white; border-radius: 6px; margin-top: 0.75rem; text-align: center; font-weight: 600;">
+                  Saldo pendiente: Bs. {{ calcularSaldoPendiente(compra) }}
+                </div>
+              </div>
+              
+              <!-- Si es contado, mostrar pago único -->
+              <div v-else-if="compra.pago" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
                 <p style="margin: 0; color: var(--color-text); font-size: 0.9rem;">
                   <strong>Método:</strong> {{ compra.pago.metodo.toUpperCase() }}
                 </p>
@@ -191,8 +218,11 @@
 
             <!-- Botón para pagar si está pendiente -->
             <div v-if="compra.estado === 'pendiente'" style="display: flex; justify-content: flex-end; gap: 1rem;">
-              <button @click="pagarCompra(compra)" class="btn btn-primary" style="padding: 0.75rem 1.5rem;">
+              <button v-if="compra.tipo === 'contado'" @click="pagarCompra(compra)" class="btn btn-primary" style="padding: 0.75rem 1.5rem;">
                 Pagar ahora
+              </button>
+              <button v-else @click="abrirModalPagoCredito(compra)" class="btn btn-primary" style="padding: 0.75rem 1.5rem;">
+                Registrar pago
               </button>
             </div>
           </div>
@@ -207,6 +237,46 @@
         </div>
       </div>
     </section>
+
+    <!-- Modal para registrar pago a crédito -->
+    <div v-if="modalPagoCredito" class="modal-overlay" @click="cerrarModalPagoCredito">
+      <div class="modal-content" @click.stop style="max-width: 500px;">
+        <h3 style="margin: 0 0 1.5rem 0; color: var(--color-primary);">Registrar Pago a Crédito</h3>
+        
+        <div style="background: var(--color-bg); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+          <p style="margin: 0 0 0.5rem 0; color: var(--color-text);"><strong>Compra #{{ ventaSeleccionada?.id }}</strong></p>
+          <p style="margin: 0 0 0.5rem 0; color: var(--color-text);">Total: <strong style="color: var(--color-primary);">Bs. {{ parseFloat(ventaSeleccionada?.total || 0).toFixed(2) }}</strong></p>
+          <p style="margin: 0; color: var(--color-text);">Saldo pendiente: <strong style="color: #ef4444;">Bs. {{ calcularSaldoPendiente(ventaSeleccionada) }}</strong></p>
+        </div>
+
+        <form @submit.prevent="registrarPagoCredito">
+          <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label class="form-label">Monto a pagar (Bs.)</label>
+            <input 
+              v-model.number="formPagoCredito.monto" 
+              type="number" 
+              step="0.01"
+              min="0.01"
+              :max="parseFloat(calcularSaldoPendiente(ventaSeleccionada))"
+              class="form-input"
+              required
+            >
+            <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--color-text-light);">
+              Se generará un código QR con PagoFácil para este monto
+            </p>
+          </div>
+
+          <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+            <button type="button" @click="cerrarModalPagoCredito" class="btn btn-secondary">
+              Cancelar
+            </button>
+            <button type="submit" class="btn btn-primary" :disabled="procesandoPago">
+              {{ procesandoPago ? 'Generar QR' : 'Continuar con QR' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
 
     <!-- Footer -->
     <footer class="footer">
@@ -273,8 +343,17 @@ const carrito = ref([]);
 
 // Estados de compras
 const cargando = ref(true);
+const filtroTipo = ref('');
 const filtroEstado = ref('');
 const compras = ref([]);
+
+// Estados del modal de pago a crédito
+const modalPagoCredito = ref(false);
+const ventaSeleccionada = ref(null);
+const procesandoPago = ref(false);
+const formPagoCredito = ref({
+  monto: 0
+});
 
 // Verificar si hay usuario logueado
 const usuarioData = localStorage.getItem('user');
@@ -301,10 +380,17 @@ const fontSizeClass = computed(() => `font-size-${fontSize.value}`);
 const fontSizeLabel = computed(() => `${fontSize.value}px`);
 
 const comprasFiltradas = computed(() => {
-  if (!filtroEstado.value) {
-    return compras.value;
+  let resultado = compras.value;
+  
+  if (filtroTipo.value) {
+    resultado = resultado.filter(c => c.tipo === filtroTipo.value);
   }
-  return compras.value.filter(c => c.estado === filtroEstado.value);
+  
+  if (filtroEstado.value) {
+    resultado = resultado.filter(c => c.estado === filtroEstado.value);
+  }
+  
+  return resultado;
 });
 
 const carritoCount = computed(() => {
@@ -364,7 +450,7 @@ const cerrarSesion = () => {
   window.location.reload();
 };
 
-// Función para pagar compra pendiente
+// Función para pagar compra de contado pendiente
 const pagarCompra = async (compra) => {
   try {
     // Preparar productos para el carrito temporal
@@ -373,18 +459,80 @@ const pagarCompra = async (compra) => {
       nombre: detalle.producto ? detalle.producto.nombre : 'Producto',
       cantidad: detalle.cantidad,
       costo_unitario: parseFloat(detalle.precio_unitario),
-      stock_maximo: detalle.cantidad
+      stock_maximo: detalle.cantidad,
+      imagen_url: detalle.producto?.imagen_url || ''
     }));
 
-    // Guardar en localStorage temporalmente
-    localStorage.setItem('carrito_pago', JSON.stringify(productosCarrito));
-    localStorage.setItem('venta_id_pago', compra.id);
+    // Guardar en localStorage con la clave correcta
+    localStorage.setItem('carrito', JSON.stringify(productosCarrito));
+    localStorage.setItem('venta_pendiente_id', compra.id);
     
     // Redirigir a página de pago QR
     window.location.href = getAppUrl('/pago-qr');
   } catch (error) {
     console.error('Error al procesar pago:', error);
     alert('Error al procesar el pago');
+  }
+};
+
+// Funciones para pago a crédito
+const abrirModalPagoCredito = (compra) => {
+  ventaSeleccionada.value = compra;
+  const saldoPendiente = parseFloat(calcularSaldoPendiente(compra));
+  formPagoCredito.value = {
+    monto: saldoPendiente
+  };
+  modalPagoCredito.value = true;
+};
+
+const cerrarModalPagoCredito = () => {
+  modalPagoCredito.value = false;
+  ventaSeleccionada.value = null;
+  formPagoCredito.value = {
+    monto: 0
+  };
+};
+
+const calcularSaldoPendiente = (compra) => {
+  if (!compra) return '0.00';
+  
+  const total = parseFloat(compra.total);
+  
+  // Si tiene pagos, sumar todos los pagos realizados
+  const pagosRealizados = compra.pagos ? 
+    compra.pagos.reduce((sum, pago) => sum + parseFloat(pago.monto), 0) : 0;
+  
+  const saldo = total - pagosRealizados;
+  return saldo.toFixed(2);
+};
+
+const registrarPagoCredito = async () => {
+  if (!ventaSeleccionada.value) return;
+  
+  const monto = parseFloat(formPagoCredito.value.monto);
+  const saldoPendiente = parseFloat(calcularSaldoPendiente(ventaSeleccionada.value));
+  
+  if (monto <= 0 || monto > saldoPendiente) {
+    alert(`El monto debe ser mayor a 0 y no puede exceder el saldo pendiente (Bs. ${saldoPendiente})`);
+    return;
+  }
+  
+  procesandoPago.value = true;
+  
+  try {
+    // Guardar datos temporalmente para generar QR
+    localStorage.setItem('pago_credito_pendiente', JSON.stringify({
+      venta_id: ventaSeleccionada.value.id,
+      monto: monto,
+      metodo: 'qr'
+    }));
+    
+    // Redirigir a página de QR para pago a crédito
+    window.location.href = getAppUrl('/pago-credito-qr');
+  } catch (error) {
+    console.error('Error al procesar pago:', error);
+    alert('Error al procesar el pago');
+    procesandoPago.value = false;
   }
 };
 
@@ -489,5 +637,29 @@ onMounted(async () => {
 .badge-pagada {
   background: #d1fae5;
   color: #065f46;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: var(--color-bg-alt);
+  border-radius: 12px;
+  padding: 2rem;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
 }
 </style>

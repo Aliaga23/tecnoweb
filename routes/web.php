@@ -83,6 +83,10 @@ Route::get('/pago-qr', function () {
     return Inertia::render('PagoQR');
 });
 
+Route::get('/pago-credito-qr', function () {
+    return Inertia::render('PagoCreditoQR');
+});
+
 Route::get('/mis-compras', function () {
     return Inertia::render('MisCompras');
 });
