@@ -358,23 +358,25 @@ class PagoController extends Controller
 
             $qrData = Cache::get('qr_' . $pagoId);
             $qrDataCredito = Cache::get('qr_credito_' . $pagoId);
+            $qrDataContado = Cache::get('qr_venta_contado_' . $pagoId);
             
-            // Si es pago a crédito, verificar confirmación desde el callback
+            // Si es pago a crédito o contado con QR, verificar confirmación desde el callback
             $esPagoCredito = $qrDataCredito !== null;
+            $esPagoContadoQR = $qrDataContado !== null;
             $pagoConfirmado = false;
             
-            if ($esPagoCredito) {
+            if ($esPagoCredito || $esPagoContadoQR) {
                 $pagoConfirmado = Cache::get('pago_confirmado_' . $pagoId);
             }
 
             return response()->json([
                 'success' => true,
-                'pagado' => $esPagoCredito ? ($pagoConfirmado || false) : ($pago->venta_estado === 'pagada'),
+                'pagado' => ($esPagoCredito || $esPagoContadoQR) ? ($pagoConfirmado || false) : ($pago->venta_estado === 'pagada'),
                 'pago_id' => $pago->id,
                 'estado' => $pago->venta_estado,
                 'monto' => $pago->monto,
-                'payment_number' => ($qrData['payment_number'] ?? $qrDataCredito['payment_number'] ?? 'N/A'),
-                'transaction_id' => ($qrData['transaction_id'] ?? $qrDataCredito['transaction_id'] ?? 'N/A'),
+                'payment_number' => ($qrData['payment_number'] ?? $qrDataCredito['payment_number'] ?? $qrDataContado['payment_number'] ?? 'N/A'),
+                'transaction_id' => ($qrData['transaction_id'] ?? $qrDataCredito['transaction_id'] ?? $qrDataContado['transaction_id'] ?? 'N/A'),
                 'fecha_pago' => $pago->fecha_pago
             ]);
 
