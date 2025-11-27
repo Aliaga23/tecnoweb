@@ -17,7 +17,9 @@
     "dependencies": {
         "@inertiajs/vue3": "^2.2.18",
         "@vitejs/plugin-vue": "^6.0.2",
+        "chart.js": "^4.5.1",
         "lucide-vue-next": "^0.554.0",
-        "vue": "^3.5.25"
+        "vue": "^3.5.25",
+        "vue-chartjs": "^5.3.3"
     }
 }

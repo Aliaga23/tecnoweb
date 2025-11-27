@@ -59,9 +59,7 @@
         
         <ul class="navbar-menu">
           <li><a :href="getAppUrl('/')" class="navbar-link">Inicio</a></li>
-          <li><a href="/#productos" class="navbar-link">Productos</a></li>
-          <li><a href="/#categorias" class="navbar-link">Categorías</a></li>
-          <li><a href="/#contacto" class="navbar-link">Contacto</a></li>
+          <li><a :href="getAppUrl('/catalogo')" class="navbar-link">Productos</a></li>
         </ul>
 
         <div class="navbar-controls">

@@ -133,6 +133,70 @@
             <p style="color: var(--color-text-light); font-weight: 600;">Ventas</p>
           </div>
         </div>
+
+        <!-- Reportes -->
+        <h2 class="section-title" style="margin-bottom: 2rem;">Reportes y Análisis</h2>
+        
+        <div class="grid grid-cols-2" style="gap: 2rem; margin-bottom: 3rem;">
+          <!-- Ventas por Mes -->
+          <div class="card" style="padding: 2rem;">
+            <h3 style="margin-bottom: 1.5rem; color: var(--color-text); font-weight: 600;">Ventas por Mes (Últimos 6 meses)</h3>
+            <div v-if="cargandoReportes" style="text-align: center; padding: 2rem;">Cargando...</div>
+            <Bar v-else-if="ventasPorMesData" :data="ventasPorMesData" :options="chartOptions" />
+          </div>
+
+          <!-- Productos Top -->
+          <div class="card" style="padding: 2rem;">
+            <h3 style="margin-bottom: 1.5rem; color: var(--color-text); font-weight: 600;">Top 5 Productos Más Vendidos</h3>
+            <div v-if="cargandoReportes" style="text-align: center; padding: 2rem;">Cargando...</div>
+            <Bar v-else-if="productosTopData" :data="productosTopData" :options="chartOptionsHorizontal" />
+          </div>
+
+          <!-- Estado de Ventas -->
+          <div class="card" style="padding: 2rem;">
+            <h3 style="margin-bottom: 1.5rem; color: var(--color-text); font-weight: 600;">Estado de Ventas</h3>
+            <div v-if="cargandoReportes" style="text-align: center; padding: 2rem;">Cargando...</div>
+            <div v-else-if="estadoVentasData" style="display: flex; align-items: center; gap: 2rem;">
+              <div style="width: 200px; height: 200px;">
+                <Doughnut :data="estadoVentasData" :options="pieOptions" />
+              </div>
+              <div style="flex: 1;">
+                <div v-for="item in reportes.estadoVentas" :key="item.estado" style="margin-bottom: 1rem;">
+                  <p style="font-weight: 600; color: var(--color-text);">{{ item.estado.toUpperCase() }}</p>
+                  <p style="color: var(--color-text-light);">Cantidad: {{ item.cantidad }}</p>
+                  <p style="color: var(--color-text-light);">Total: Bs. {{ parseFloat(item.total).toFixed(2) }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stock Bajo -->
+          <div class="card" style="padding: 2rem;">
+            <h3 style="margin-bottom: 1.5rem; color: var(--color-text); font-weight: 600;">Productos con Stock Bajo (< 10)</h3>
+            <div v-if="cargandoReportes" style="text-align: center; padding: 2rem;">Cargando...</div>
+            <div v-else-if="reportes.productosStockBajo.length === 0" style="text-align: center; padding: 2rem; color: var(--color-text-light);">
+              ✓ No hay productos con stock bajo
+            </div>
+            <div v-else style="max-height: 300px; overflow-y: auto;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                  <tr style="border-bottom: 2px solid var(--color-border);">
+                    <th style="padding: 0.75rem; text-align: left; font-weight: 600; color: var(--color-text);">Producto</th>
+                    <th style="padding: 0.75rem; text-align: center; font-weight: 600; color: var(--color-text);">Stock</th>
+                    <th style="padding: 0.75rem; text-align: left; font-weight: 600; color: var(--color-text);">Categoría</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="producto in reportes.productosStockBajo" :key="producto.nombre" style="border-bottom: 1px solid var(--color-border);">
+                    <td style="padding: 0.75rem; color: var(--color-text);">{{ producto.nombre }}</td>
+                    <td style="padding: 0.75rem; text-align: center; color: #dc2626; font-weight: 600;">{{ producto.stock_actual }}</td>
+                    <td style="padding: 0.75rem; color: var(--color-text-light);">{{ producto.categoria }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -160,6 +224,21 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { User } from 'lucide-vue-next';
 import { useApi } from '../composables/useApi';
+import { Bar, Doughnut } from 'vue-chartjs';
+import {
+  Chart as ChartJS,
+  Title,
+  Tooltip,
+  Legend,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  ArcElement
+} from 'chart.js';
+
+// Registrar componentes de Chart.js
+ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement);
+
 const { apiFetch, getAppUrl } = useApi();
 
 // Accesibilidad
@@ -255,6 +334,122 @@ const stats = ref({
   ventas: 0
 });
 
+// Reportes
+const cargandoReportes = ref(true);
+const reportes = ref({
+  ventasPorMes: [],
+  productosTop: [],
+  estadoVentas: [],
+  productosStockBajo: []
+});
+
+// Datos para gráficas
+const ventasPorMesData = computed(() => {
+  if (reportes.value.ventasPorMes.length === 0) return null;
+  
+  return {
+    labels: reportes.value.ventasPorMes.map(item => item.mes),
+    datasets: [{
+      label: 'Ventas (Bs.)',
+      data: reportes.value.ventasPorMes.map(item => parseFloat(item.total)),
+      backgroundColor: 'rgba(59, 130, 246, 0.5)',
+      borderColor: 'rgba(59, 130, 246, 1)',
+      borderWidth: 2
+    }]
+  };
+});
+
+const productosTopData = computed(() => {
+  if (reportes.value.productosTop.length === 0) return null;
+  
+  return {
+    labels: reportes.value.productosTop.map(item => item.nombre),
+    datasets: [{
+      label: 'Cantidad Vendida',
+      data: reportes.value.productosTop.map(item => parseInt(item.cantidad_vendida)),
+      backgroundColor: [
+        'rgba(34, 197, 94, 0.5)',
+        'rgba(59, 130, 246, 0.5)',
+        'rgba(251, 146, 60, 0.5)',
+        'rgba(168, 85, 247, 0.5)',
+        'rgba(236, 72, 153, 0.5)'
+      ],
+      borderColor: [
+        'rgba(34, 197, 94, 1)',
+        'rgba(59, 130, 246, 1)',
+        'rgba(251, 146, 60, 1)',
+        'rgba(168, 85, 247, 1)',
+        'rgba(236, 72, 153, 1)'
+      ],
+      borderWidth: 2
+    }]
+  };
+});
+
+const estadoVentasData = computed(() => {
+  if (reportes.value.estadoVentas.length === 0) return null;
+  
+  return {
+    labels: reportes.value.estadoVentas.map(item => item.estado.toUpperCase()),
+    datasets: [{
+      data: reportes.value.estadoVentas.map(item => parseInt(item.cantidad)),
+      backgroundColor: [
+        'rgba(34, 197, 94, 0.7)',
+        'rgba(251, 146, 60, 0.7)'
+      ],
+      borderColor: [
+        'rgba(34, 197, 94, 1)',
+        'rgba(251, 146, 60, 1)'
+      ],
+      borderWidth: 2
+    }]
+  };
+});
+
+// Opciones de gráficas
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: true,
+  plugins: {
+    legend: {
+      display: true,
+      position: 'top'
+    }
+  },
+  scales: {
+    y: {
+      beginAtZero: true
+    }
+  }
+};
+
+const chartOptionsHorizontal = {
+  indexAxis: 'y',
+  responsive: true,
+  maintainAspectRatio: true,
+  plugins: {
+    legend: {
+      display: false
+    }
+  },
+  scales: {
+    x: {
+      beginAtZero: true
+    }
+  }
+};
+
+const pieOptions = {
+  responsive: true,
+  maintainAspectRatio: true,
+  plugins: {
+    legend: {
+      display: true,
+      position: 'right'
+    }
+  }
+};
+
 const cargarEstadisticas = async () => {
   const token = localStorage.getItem('token');
   
@@ -274,9 +469,52 @@ const cargarEstadisticas = async () => {
     const usuariosData = await usuariosRes.json();
     stats.value.usuarios = usuariosData.data?.length || 0;
 
-    stats.value.ventas = 0; // Placeholder hasta implementar ventas
+    // Cargar ventas
+    const ventasRes = await apiFetch('/api/ventas');
+    const ventasData = await ventasRes.json();
+    stats.value.ventas = ventasData.data?.length || 0;
   } catch (error) {
     console.error('Error al cargar estadísticas:', error);
+  }
+};
+
+const cargarReportes = async () => {
+  cargandoReportes.value = true;
+  
+  try {
+    // Cargar todos los reportes en paralelo
+    const [ventasMesRes, topProductosRes, estadoRes, stockBajoRes] = await Promise.all([
+      apiFetch('/api/reportes/ventas-por-mes'),
+      apiFetch('/api/reportes/productos-top-ventas'),
+      apiFetch('/api/reportes/estado-ventas'),
+      apiFetch('/api/reportes/productos-stock-bajo')
+    ]);
+
+    const ventasMesData = await ventasMesRes.json();
+    const topProductosData = await topProductosRes.json();
+    const estadoData = await estadoRes.json();
+    const stockBajoData = await stockBajoRes.json();
+
+    if (ventasMesData.success) {
+      reportes.value.ventasPorMes = ventasMesData.data;
+    }
+
+    if (topProductosData.success) {
+      reportes.value.productosTop = topProductosData.data;
+    }
+
+    if (estadoData.success) {
+      reportes.value.estadoVentas = estadoData.data;
+    }
+
+    if (stockBajoData.success) {
+      reportes.value.productosStockBajo = stockBajoData.data;
+    }
+
+  } catch (error) {
+    console.error('Error al cargar reportes:', error);
+  } finally {
+    cargandoReportes.value = false;
   }
 };
 
@@ -318,6 +556,7 @@ onMounted(async () => {
   
   await registrarVisita();
   cargarEstadisticas();
+  cargarReportes();
 });
 </script>
 

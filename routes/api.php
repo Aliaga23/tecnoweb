@@ -15,6 +15,7 @@ use App\Http\Controllers\DevolucionController;
 use App\Http\Controllers\DevolucionProveedorController;
 use App\Http\Controllers\TransaccionController;
 use App\Http\Controllers\ImagenController;
+use App\Http\Controllers\ReporteController;
 
 /*
 |--------------------------------------------------------------------------
@@ -182,5 +183,13 @@ Route::middleware('auth:api')->group(function () {
     
     // Pago QR para crédito
     Route::post('/generar-qr-credito', [PagoController::class, 'generarQRCredito']);
+});
+
+// Rutas de reportes (requieren autenticación)
+Route::middleware('auth:api')->group(function () {
+    Route::get('/reportes/ventas-por-mes', [ReporteController::class, 'ventasPorMes']);
+    Route::get('/reportes/productos-top-ventas', [ReporteController::class, 'productosTopVentas']);
+    Route::get('/reportes/estado-ventas', [ReporteController::class, 'estadoVentas']);
+    Route::get('/reportes/productos-stock-bajo', [ReporteController::class, 'productosStockBajo']);
 });
 
