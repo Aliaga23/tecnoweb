@@ -72,7 +72,6 @@
                 <User :size="24" />
               </button>
               <div v-if="userMenuOpen" class="user-menu">
-                <a :href="getAppUrl('/perfil')" class="user-menu-item">Mi perfil</a>
                 <a :href="getAppUrl('/mis-cotizaciones')" class="user-menu-item">Mis cotizaciones</a>
                 <a :href="getAppUrl('/mis-compras')" class="user-menu-item">Mis compras</a>
                 <a :href="getAppUrl('/mis-devoluciones')" class="user-menu-item">Mis devoluciones</a>
@@ -463,11 +462,10 @@ const pagarCompra = async (compra) => {
       imagen_url: detalle.producto?.imagen_url || ''
     }));
 
-    // Guardar en localStorage con la clave correcta
+    // Guardar en localStorage
     localStorage.setItem('carrito', JSON.stringify(productosCarrito));
-    localStorage.setItem('venta_pendiente_id', compra.id);
     
-    // Redirigir a página de pago QR
+    // Redirigir a página de pago QR (flujo normal, creará una nueva venta)
     window.location.href = getAppUrl('/pago-qr');
   } catch (error) {
     console.error('Error al procesar pago:', error);

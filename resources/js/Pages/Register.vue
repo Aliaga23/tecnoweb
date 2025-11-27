@@ -72,7 +72,6 @@
                 <User :size="24" />
               </button>
               <div v-if="userMenuOpen" class="user-menu">
-                <a :href="getAppUrl('/perfil')" class="user-menu-item">Mi perfil</a>
                 <a :href="getAppUrl('/mis-cotizaciones')" class="user-menu-item">Mis cotizaciones</a>
                 <a :href="getAppUrl('/mis-compras')" class="user-menu-item">Mis compras</a>
                 <a :href="getAppUrl('/mis-devoluciones')" class="user-menu-item">Mis devoluciones</a>

@@ -93,8 +93,7 @@
             <button @click="toggleUserMenu" class="navbar-icon" title="Mi cuenta">
               <User :size="24" />
             </button>
-            <div v-if="userMenuOpen" class="user-menu">
-              <a :href="getAppUrl('/perfil')" class="user-menu-item">Mi perfil</a>
+              <div v-if="userMenuOpen" class="user-menu">
               <button @click="cerrarSesion" class="user-menu-item">Cerrar sesión</button>
             </div>
           </div>
