@@ -95,7 +95,24 @@ class Producto extends Model
             [$id]
         );
 
-        return !empty($productos) ? $productos[0] : null;
+        if (empty($productos)) {
+            return null;
+        }
+
+        $p = $productos[0];
+        
+        return (object)[
+            'id' => $p->id,
+            'nombre' => $p->nombre,
+            'descripcion' => $p->descripcion,
+            'precio_unitario' => $p->precio_unitario,
+            'stock_actual' => $p->stock_actual,
+            'imagen_url' => $p->imagen_url,
+            'categoria_id' => $p->categoria_id,
+            'categoria' => $p->categoria_nombre ? (object)[
+                'nombre' => $p->categoria_nombre
+            ] : null
+        ];
     }
 
     public static function obtenerPorId($id)
