@@ -82,7 +82,7 @@
             <a :href="getAppUrl('/login')" class="btn btn-primary">Ingresar</a>
           </template>
           <a :href="getAppUrl('/cart')" class="navbar-icon" title="Carrito" style="position: relative;">
-            <ShoppingCart :size="24" />
+            <ShoppingCart :size="28" />
           </a>
         </div>
       </div>
